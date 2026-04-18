@@ -1,12 +1,17 @@
 import streamlit as st
 from supabase import create_client, Client
 
-# Koneksi (Pastiin di Secrets Streamlit udah bener isinya)
+# Ambil kredensial dari Streamlit Secrets
 URL = st.secrets["SUPABASE_URL"]
 KEY = st.secrets["SUPABASE_KEY"]
+
+# Inisialisasi client
 supabase: Client = create_client(URL, KEY)
 
-# --- FUNGSI UNTUK USER ---
+def list_all_users():
+    # Contoh fungsi buat ambil data, pastiin nama tabelnya bener
+    response = supabase.table("users").select("*").execute()
+    return response.data
 
 def get_user_profile(user_id):
     return supabase.table("profiles").select("*").eq("id", user_id).execute()
