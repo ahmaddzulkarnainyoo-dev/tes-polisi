@@ -4,7 +4,9 @@ from timer import start_countdown
 from engine import generate_psychogram
 from database import supabase
 
-import streamlit as st
+# --- BIKIN MENU NAVIGASI DULU DI SINI ---
+st.sidebar.title("🛡️ Psychotech Polri")
+menu = st.sidebar.radio("Navigasi", ["Home", "Mulai Simulasi", "Dashboard Admin"])
 
 # --- CSS CUSTOM ---
 st.markdown("""
@@ -71,6 +73,7 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
 def show_home():
     # Hero Section
     st.markdown("""
@@ -125,3 +128,7 @@ def show_home():
 # Panggil fungsi ini di logika routing lo
 if menu == "Home":
     show_home()
+elif menu == "Mulai Simulasi":
+    st.write("Halaman Simulasi belum diisi.") # Lo ganti sama fungsi simulasi lo nanti
+elif menu == "Dashboard Admin":
+    st.write("Halaman Admin belum diisi.") # Lo ganti sama fungsi admin lo nanti
