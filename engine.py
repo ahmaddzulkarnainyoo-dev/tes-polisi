@@ -1,5 +1,17 @@
 import plotly.graph_objects as go
 import streamlit as st
+from groq import Groq
+
+def get_ai_analysis(skor, kategori):
+    client = Groq(api_key=st.secrets["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"])
+    
+    prompt = f"User dapet skor {skor} di kategori {kategori} psikotes Polri. Berikan analisis singkat dan saran pengembangan secara profesional namun santai."
+    
+    chat_completion = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="llama3-8b-8192",
+    )
+    return chat_completion.choices[0].message.content
 
 def generate_psychogram(scores):
     # scores: dict {'Kecerdasan': 85, 'Kepribadian': 70, 'Sikap Kerja': 90, ...}
