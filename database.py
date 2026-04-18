@@ -3,7 +3,7 @@ import os
 from supabase import create_client, Client
 
 # Ambil dari environment variables (keamanan nomor 1!)
-URL = os.environ.get("SUPABASE_URL")
+URL = os.environ.get("https://hnaxbsjcrpcpxvomivfy.supabase.co")
 KEY = os.environ.get("sb_publishable_SUaYNqk-K3Y-T8YDM9BEJw_6dlMXh1G")
 supabase: Client = create_client(URL, KEY)
 
