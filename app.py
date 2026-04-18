@@ -79,7 +79,7 @@ def show_home():
     st.markdown("""
         <div class="hero-container">
             <h1>🛡️ Psychotech Polri v1.0</h1>
-            <p>Platform Simulasi Psikotes Terakurat dengan Analisis AI Groq</p>
+            <p>Platform Simulasi Psikotes Terakurat dengan Analisis lengkap</p>
         </div>
     """, unsafe_allow_html=True)
 
