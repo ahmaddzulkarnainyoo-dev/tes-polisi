@@ -73,7 +73,40 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+def show_simulation():
+    st.markdown('<div class="hero-container"><h1>📝 Simulasi Psikotes</h1></div>', unsafe_allow_html=True)
+    
+    # 1. Buka file JSON lo
+    try:
+        with open('soal.json', 'r') as f:
+            data_soal = json.load(f)
+    except FileNotFoundError:
+        st.error("Waduh bro, file soal.json nggak ketemu di folder!")
+        return
 
+    responses = {}
+    
+    # 2. Tampilin Soal di dalam Form
+    with st.form("test_form"):
+        for soal in data_soal:
+            with st.container():
+                st.markdown(f'<div class="soal-card">', unsafe_allow_html=True)
+                st.subheader(f"Soal {soal['id']} - {soal.get('kategori', 'Umum')}")
+                
+                if soal.get('image_url'):
+                    st.image(soal['image_url'], use_container_width=True)
+                
+                st.write(soal['pertanyaan'])
+                # Simpan jawaban user ke dictionary responses
+                responses[soal['id']] = st.radio(f"Pilih jawaban:", soal['opsi'], key=f"q_{soal['id']}")
+                st.markdown('</div>', unsafe_allow_html=True)
+        
+        # 3. Tombol Submit
+        submitted = st.form_submit_button("Selesaikan Tes & Lihat Hasil")
+
+    if submitted:
+        # Panggil fungsi hitung skor (nanti kita buat di engine.py atau langsung di sini)
+        st.success("Jawaban terkirim! Sekarang AI lagi proses skor lo...")
 def show_home():
     # Hero Section
     st.markdown("""
