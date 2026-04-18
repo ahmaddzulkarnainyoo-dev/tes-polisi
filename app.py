@@ -126,9 +126,12 @@ def show_home():
     """, unsafe_allow_html=True)
 
 # Panggil fungsi ini di logika routing lo
+# --- LOGIKA NAVIGASI ---
 if menu == "Home":
     show_home()
 elif menu == "Mulai Simulasi":
-    st.write("Halaman Simulasi belum diisi.") # Lo ganti sama fungsi simulasi lo nanti
+    show_simulation() # <--- Panggil fungsi yang kita buat tadi
 elif menu == "Dashboard Admin":
-    st.write("Halaman Admin belum diisi.") # Lo ganti sama fungsi admin lo nanti
+    # Kalau lo udah bikin admin.py, lo bisa import dan panggil di sini
+    import admin
+    admin.show_admin_panel()
