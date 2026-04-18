@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "kategori": "Kecerdasan",
+    "sub_kategori": "Analogi Verbal",
+    "pertanyaan": "Mobil : Bensin = Pelari : ....",
+    "opsi": ["Sepatu", "Lintasan", "Makanan", "Juara"],
+    "jawaban": "Makanan",
+    "poin": 5
+  },
+  {
+    "id": 2,
+    "kategori": "Kepribadian",
+    "sub_kategori": "Stabilitas Emosi",
+    "pertanyaan": "Saat rekan kerja mengkritik hasil kerja saya, saya akan...",
+    "opsi": ["Marah", "Diam saja", "Mengevaluasi diri", "Membalas kritiknya"],
+    "jawaban": "Mengevaluasi diri",
+    "poin": 5
+  }
+]
