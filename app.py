@@ -28,7 +28,8 @@ def run_simulasi():
             st.divider()
         
         submitted = st.form_submit_button("Selesaikan Tes")
-        
+        if soal.get('image_url'):
+            st.image(soal['image_url'], caption=f"Gambar Soal {soal['id']}")
         if submitted:
             for soal in data_soal:
                 if responses[soal['id']] == soal['jawaban']:
