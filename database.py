@@ -1,10 +1,12 @@
-# database.py
-import os
+import streamlit as st
 from supabase import create_client, Client
 
-# Ambil dari environment variables (keamanan nomor 1!)
-URL = os.environ.get("https://hnaxbsjcrpcpxvomivfy.supabase.co")
-KEY = os.environ.get("sb_publishable_SUaYNqk-K3Y-T8YDM9BEJw_6dlMXh1G")
+# Panggil "kunci" dari Secrets Streamlit Cloud
+# Nama di dalam kurung harus SAMA PERSIS dengan yang di dashboard Secrets
+URL = st.secrets["SUPABASE_URL"]
+KEY = st.secrets["SUPABASE_KEY"]
+
+# Bikin koneksi
 supabase: Client = create_client(URL, KEY)
 
 def get_user_profile(user_id):
