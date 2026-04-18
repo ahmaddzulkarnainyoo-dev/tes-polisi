@@ -1,13 +1,13 @@
+import streamlit as st
 import time
 
-# Contoh logic timer sederhana
-def start_timer(seconds):
+def start_countdown(seconds):
     timer_slot = st.empty()
-    for remaining in range(seconds, -1, -1):
-        mins, secs = divmod(remaining, 60)
-        timer_slot.metric("Sisa Waktu", f"{mins:02d}:{secs:02d}")
+    for remaining in range(seconds, -1,-1):
+        mins, secs=divmod(remaining,60)
+        timer_slot, metric("sisa waktu",f"{mins:02d}:{secs:02d}")
         time.sleep(1)
         if remaining == 0:
-            st.error("Waktu Habis!")
+            st.error("waktu habis boy!")
             return True
-    return False
+        return False
