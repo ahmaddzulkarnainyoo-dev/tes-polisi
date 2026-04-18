@@ -1,16 +1,30 @@
-# Bagian di sidebar app.py
-menu = st.sidebar.selectbox("Menu", ["Simulasi Tes", "Admin Panel"])
+import streamlit as st
+from database import list_all_users, activate_premium
 
-if menu == "Admin Panel":
-    st.header("Admin Control - Aktivasi User")
-    access_code = st.text_input("Admin Code", type="password")
+def show_admin_page():
+    st.header("🔑 Admin Control Panel")
     
-    if access_code == "GUEPUNYAPROJEK": # Ganti password rahasia lo
+    # Simple Password Protection
+    pw = st.text_input("Masukkan Kode Admin", type="password")
+    if pw != "GUEPUNYAPROJEK": # Ganti sesuka lo
+        st.error("Kode salah.")
+        return
+
+    st.subheader("Daftar Pengguna")
+    try:
         users = list_all_users().data
-        for u in users:
-            col1, col2 = st.columns([3, 1])
-            col1.write(f"{u['full_name']} | Premium: {u['is_premium']}")
-            if col2.button("Aktifkan", key=u['id']):
-                activate_premium(u['id'])
-                st.success(f"User {u['id']} Aktif!")
-                
+        if users:
+            for u in users:
+                col1, col2 = st.columns([3, 1])
+                status = "✅ Premium" if u['is_premium'] else "❌ Standard"
+                col1.write(f"ID: `{u['id']}` | Status: {status}")
+                if not u['is_premium']:
+                    if col2.button("Aktifkan", key=u['id']):
+                        activate_premium(u['id'])
+                        st.success("User diaktifkan!")
+                        st.rerun()
+        else:
+            st.info("Belum ada user terdaftar.")
+    except Exception as e:
+        st.error(f"Gagal narik data: {e}")
+        
