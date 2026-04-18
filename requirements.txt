@@ -4,4 +4,4 @@ plotly
 pandas
 python-dotenv
 groq
-plotly
+
