@@ -31,13 +31,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def show_simulation():
-    st.markdown('<div class="hero-container"><h1>📝 Simulasi AI Real-Time</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-container"><h1>📝 Simulasi Real-Time</h1></div>', unsafe_allow_html=True)
     
     # 1. Inisialisasi State agar data tidak hilang saat pindah halaman
     if 'step' not in st.session_state:
         st.session_state.step = 1
         st.session_state.skor = 0
-        with st.spinner("AI sedang meracik soal pertama..."):
+        with st.spinner("tunggu sebentar"):
             st.session_state.soal_aktif = generate_soal_ai()
 
     # Batas simulasi, misal 10 soal
@@ -83,8 +83,8 @@ def show_simulation():
 def show_home():
     st.markdown("""
         <div class="hero-container">
-            <h1>🛡️ Psychotech Polri v1.0</h1>
-            <p>Platform Simulasi Psikotes Terakurat dengan Analisis AI Groq</p>
+            <h1>🛡️ tes Psikologi Polri v1.0</h1>
+            <p>Platform Simulasi Psikotes Terakurat dilengkapi dengan analisi</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -92,7 +92,7 @@ def show_home():
     with col1:
         st.markdown('<div class="nav-card"><div class="card-icon">📝</div><div class="card-title">Simulasi Realistis</div><div class="card-desc">Satu soal per halaman untuk fokus maksimal.</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown('<div class="nav-card"><div class="card-icon">🤖</div><div class="card-title">Dynamic AI</div><div class="card-desc">Soal di-generate acak oleh AI setiap kali lo main.</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="nav-card"><div class="card-icon">🤖</div><div class="card-title">Dynamic AI</div><div class="card-desc">Soal di acak setiap kali lo lathan.</div></div>', unsafe_allow_html=True)
     with col3:
         st.markdown('<div class="nav-card"><div class="card-icon">📊</div><div class="card-title">Leaderboard</div><div class="card-desc">Buktikan lo Casis paling siap tahun ini.</div></div>', unsafe_allow_html=True)
 
