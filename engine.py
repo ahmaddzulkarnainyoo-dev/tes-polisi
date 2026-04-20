@@ -25,3 +25,4 @@ def generate_soal_ai():
     raw = completion.choices[0].message.content
     match = re.search(r'\{.*\}', raw, re.DOTALL)
     return json.loads(match.group()) if match else json.loads(raw)
+    
