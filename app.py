@@ -95,7 +95,7 @@ def show_home():
     st.markdown("""
         <div class="hero-container">
             <h1>🛡️ tes Psikologi Polri v1.0</h1>
-            <p>Platform Simulasi Psikotes Terakurat dilengkapi dengan analisi</p>
+            <p>Platform Simulasi Psikotes Terakurat dilengkapi dengan analisis</p>
         </div>
     """, unsafe_allow_html=True)
 
