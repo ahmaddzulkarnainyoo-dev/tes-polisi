@@ -5,7 +5,7 @@ from engine import generate_psychogram
 from database import supabase
 
 # --- BIKIN MENU NAVIGASI DULU DI SINI ---
-st.sidebar.title("🛡️ Psychotech Polri")
+st.sidebar.title("🛡️ Psikologi Polri")
 menu = st.sidebar.radio("Navigasi", ["Home", "Mulai Simulasi", "Dashboard Admin"])
 
 # --- CSS CUSTOM ---
