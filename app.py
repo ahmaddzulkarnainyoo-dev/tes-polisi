@@ -4,7 +4,7 @@ from engine import generate_soal_ai
 from database import supabase
 
 # --- BIKIN MENU NAVIGASI ---
-st.sidebar.title("🛡️ Psikologi Polri")
+st.sidebar.title("🛡️ Tes Psikologi Polri")
 menu = st.sidebar.radio("Navigasi", ["Home", "Mulai Simulasi", "Dashboard Admin"])
 # --- SIDEBAR FOOTER ---
 st.sidebar.markdown("---") # Garis pembatas
