@@ -6,6 +6,17 @@ from database import supabase
 # --- BIKIN MENU NAVIGASI ---
 st.sidebar.title("🛡️ Psikologi Polri")
 menu = st.sidebar.radio("Navigasi", ["Home", "Mulai Simulasi", "Dashboard Admin"])
+# --- SIDEBAR FOOTER ---
+st.sidebar.markdown("---") # Garis pembatas
+st.sidebar.write("🚀 **Project Development**")
+st.sidebar.markdown(
+    """
+    <a href="https://instagram.com/username_temen_lo" target="_blank" style="text-decoration: none; color: #E1306C; font-weight: bold;">
+        Made by @username_temen_lo
+    </a>
+    """, 
+    unsafe_allow_html=True
+)
 
 # --- CSS CUSTOM (Tetap gue pertahankan gaya lo) ---
 st.markdown("""
