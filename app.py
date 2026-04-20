@@ -1,22 +1,16 @@
 import streamlit as st
-import json
-from timer import start_countdown
-from engine import generate_psychogram
+# Hapus import json karena kita pake AI sekarang
+from engine import generate_soal_ai 
 from database import supabase
 
-# --- BIKIN MENU NAVIGASI DULU DI SINI ---
+# --- BIKIN MENU NAVIGASI ---
 st.sidebar.title("🛡️ Psikologi Polri")
 menu = st.sidebar.radio("Navigasi", ["Home", "Mulai Simulasi", "Dashboard Admin"])
 
-# --- CSS CUSTOM ---
+# --- CSS CUSTOM (Tetap gue pertahankan gaya lo) ---
 st.markdown("""
     <style>
-    /* Main Background */
-    .stApp {
-        background-color: #f8f9fa;
-    }
-
-    /* Hero Section */
+    .stApp { background-color: #f8f9fa; }
     .hero-container {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
         padding: 50px 20px;
@@ -26,44 +20,6 @@ st.markdown("""
         margin-bottom: 30px;
         box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     }
-
-    /* Card Navigation */
-    .nav-card {
-        background: white;
-        padding: 30px;
-        border-radius: 15px;
-        border-bottom: 5px solid #3b82f6;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        transition: all 0.3s ease;
-        text-align: center;
-        cursor: pointer;
-        height: 250px;
-    }
-
-    .nav-card:hover {
-        transform: translateY(-10px);
-        box-shadow: 0 15px 30px rgba(0,0,0,0.1);
-        border-bottom: 5px solid #1e3a8a;
-    }
-
-    .card-icon {
-        font-size: 50px;
-        margin-bottom: 15px;
-    }
-
-    .card-title {
-        color: #1e3a8a;
-        font-weight: bold;
-        font-size: 20px;
-    }
-
-    .card-desc {
-        color: #6b7280;
-        font-size: 14px;
-        margin-top: 10px;
-    }
-
-    /* Footer */
     .footer {
         text-align: center;
         padding: 20px;
@@ -73,98 +29,84 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
 def show_simulation():
-    st.markdown('<div class="hero-container"><h1>📝 Simulasi Psikotes</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-container"><h1>📝 Simulasi AI Real-Time</h1></div>', unsafe_allow_html=True)
     
-    # 1. Buka file JSON lo
-    try:
-        with open('soal.json', 'r') as f:
-            data_soal = json.load(f)
-    except FileNotFoundError:
-        st.error("Waduh bro, file soal.json nggak ketemu di folder!")
-        return
+    # 1. Inisialisasi State agar data tidak hilang saat pindah halaman
+    if 'step' not in st.session_state:
+        st.session_state.step = 1
+        st.session_state.skor = 0
+        with st.spinner("AI sedang meracik soal pertama..."):
+            st.session_state.soal_aktif = generate_soal_ai()
 
-    responses = {}
-    
-    # 2. Tampilin Soal di dalam Form
-    with st.form("test_form"):
-        for soal in data_soal:
-            with st.container():
-                st.markdown(f'<div class="soal-card">', unsafe_allow_html=True)
-                st.subheader(f"Soal {soal['id']} - {soal.get('kategori', 'Umum')}")
-                
-                if soal.get('image_url'):
-                    st.image(soal['image_url'], use_container_width=True)
-                
-                st.write(soal['pertanyaan'])
-                # Simpan jawaban user ke dictionary responses
-                responses[soal['id']] = st.radio(f"Pilih jawaban:", soal['opsi'], key=f"q_{soal['id']}")
-                st.markdown('</div>', unsafe_allow_html=True)
+    # Batas simulasi, misal 10 soal
+    TOTAL_SOAL = 10
+
+    if st.session_state.step <= TOTAL_SOAL:
+        soal = st.session_state.soal_aktif
         
-        # 3. Tombol Submit
-        submitted = st.form_submit_button("Selesaikan Tes & Lihat Hasil")
+        st.subheader(f"Soal Nomor {st.session_state.step} dari {TOTAL_SOAL}")
+        st.info(f"Kategori: {soal.get('kategori', 'Umum')}")
+        
+        # 2. Tampilin Soal per Halaman menggunakan Form
+        with st.form(key=f"ujian_form_{st.session_state.step}"):
+            st.write(soal['pertanyaan'])
+            
+            pilihan = st.radio("Pilih jawaban:", soal['opsi'], key=f"radio_{st.session_state.step}")
+            
+            submitted = st.form_submit_button("Lanjut ke Soal Berikutnya ➡️")
 
-    if submitted:
-        # Panggil fungsi hitung skor (nanti kita buat di engine.py atau langsung di sini)
-        st.success("Jawaban terkirim! Sekarang AI lagi proses skor lo...")
+            if submitted:
+                # 3. Cek Skor Langsung
+                if pilihan == soal['jawaban']:
+                    st.session_state.skor += 10
+                
+                # Update ke langkah berikutnya
+                st.session_state.step += 1
+                if st.session_state.step <= TOTAL_SOAL:
+                    with st.spinner("Menyiapkan soal baru..."):
+                        st.session_state.soal_aktif = generate_soal_ai()
+                st.rerun()
+    else:
+        # 4. Hasil Akhir
+        st.balloons()
+        st.success(f"🔥 Tes Selesai! Skor total lo: {st.session_state.skor} / 100")
+        
+        # Opsi simpan ke database atau balik ke home
+        if st.button("Ulangi Tes dari Awal"):
+            del st.session_state.step
+            del st.session_state.skor
+            del st.session_state.soal_aktif
+            st.rerun()
+
 def show_home():
-    # Hero Section
     st.markdown("""
         <div class="hero-container">
             <h1>🛡️ Psychotech Polri v1.0</h1>
-            <p>Platform Simulasi Psikotes Terakurat dengan Analisis lengkap</p>
+            <p>Platform Simulasi Psikotes Terakurat dengan Analisis AI Groq</p>
         </div>
     """, unsafe_allow_html=True)
 
-    # Info Singkat (Value Proposition)
     col1, col2, col3 = st.columns(3)
-
     with col1:
-        st.markdown("""
-            <div class="nav-card">
-                <div class="card-icon">📝</div>
-                <div class="card-title">Simulasi Realistis</div>
-                <div class="card-desc">Soal-soal yang dirancang mirip dengan tes asli (Kecerdasan, Kepribadian, Kecermatan).</div>
-            </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown('<div class="nav-card"><div class="card-icon">📝</div><div class="card-title">Simulasi Realistis</div><div class="card-desc">Satu soal per halaman untuk fokus maksimal.</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown("""
-            <div class="nav-card">
-                <div class="card-icon">🤖</div>
-                <div class="card-title">Analisis AI</div>
-                <div class="card-desc">Dapatkan saran langsung dari AI Groq untuk memperbaiki kelemahan lo setelah tes.</div>
-            </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown('<div class="nav-card"><div class="card-icon">🤖</div><div class="card-title">Dynamic AI</div><div class="card-desc">Soal di-generate acak oleh AI setiap kali lo main.</div></div>', unsafe_allow_html=True)
     with col3:
-        st.markdown("""
-            <div class="nav-card">
-                <div class="card-icon">📊</div>
-                <div class="card-title">Psikogram Digital</div>
-                <div class="card-desc">Lihat grafik perkembangan mental lo secara visual dan detail.</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="nav-card"><div class="card-icon">📊</div><div class="card-title">Leaderboard</div><div class="card-desc">Buktikan lo Casis paling siap tahun ini.</div></div>', unsafe_allow_html=True)
 
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.info("💡 **Tips:** Kerjakan dengan tenang. Sistem akan mengacak soal secara otomatis.")
 
-    # Call to Action
-    st.info("💡 **Tips:** Fokuslah pada ketenangan saat mengerjakan soal Kecermatan. Gunakan Sidebar di kiri untuk mulai!")
-
-    # Footer
-    st.markdown("""
-        <div class="footer">
-            Built with ❤️ for Indonesian Casis | © 2026 Psychotech Project
-        </div>
-    """, unsafe_allow_html=True)
-
-# Panggil fungsi ini di logika routing lo
-# --- LOGIKA NAVIGASI ---
+# --- LOGIKA ROUTING ---
 if menu == "Home":
     show_home()
 elif menu == "Mulai Simulasi":
-    show_simulation() # <--- Panggil fungsi yang kita buat tadi
+    show_simulation()
 elif menu == "Dashboard Admin":
-    # Kalau lo udah bikin admin.py, lo bisa import dan panggil di sini
-    import admin
-    admin.show_admin_panel()
+    try:
+        import admin
+        admin.show_admin_panel()
+    except Exception as e:
+        st.error(f"Gagal memuat panel admin: {e}")
