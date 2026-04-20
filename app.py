@@ -42,7 +42,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def show_simulation():
-    st.markdown('<div class="hero-container"><h1>📝 Simulasi Real-Time</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-container"><h1> Simulasi Real-Time</h1></div>', unsafe_allow_html=True)
     
     # 1. Inisialisasi State agar data tidak hilang saat pindah halaman
     if 'step' not in st.session_state:
