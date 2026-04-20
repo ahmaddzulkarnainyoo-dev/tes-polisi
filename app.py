@@ -12,7 +12,7 @@ st.sidebar.write("🚀 **Project Development**")
 st.sidebar.markdown(
     """
     <a href="https://www.instagram.com/growing_together369?igsh=ZXV1eXpreXkweGh5" target="_blank" style="text-decoration: none; color: #E1306C; font-weight: bold;">
-        Made by @username_temen_lo
+        Made by @growing_together369
     </a>
     """, 
     unsafe_allow_html=True
