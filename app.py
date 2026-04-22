@@ -75,15 +75,45 @@ def show_auth():
                     else:
                         st.error("Username atau Password salah!")
 
-        with tab2:
-            with st.form("reg_form"):
-                new_u = st.text_input("Username Baru")
-                new_p = st.text_input("Password Baru", type="password")
-                if st.form_submit_button("Daftar Akun"):
-                    if register_user(new_u, new_p):
-                        st.success("Akun berhasil dibuat! Status: Pending. Silakan hubungi admin.")
+       with tab2:
+    # Desain Header Form
+            st.markdown("""
+                <div style="background-color: #ffffff; padding: 20px; border-radius: 15px; border-left: 5px solid #3b82f6; margin-bottom: 20px;">
+                    <h4 style="margin:0; color: #1e3a8a;">📝 Registrasi Casis Baru</h4>
+                    <p style="font-size: 0.9rem; color: #64748b;">Silakan buat akun untuk memulai simulasi CAT Polri.</p>
+                </div>
+            """, unsafe_allow_html=True)
+         
+            with st.form("reg_form", clear_on_submit=True):
+                new_u = st.text_input("👤 Username Baru", placeholder="Contoh: casis_hebat")
+                new_p = st.text_input("🔑 Password Baru", type="password", placeholder="Minimal 6 karakter")
+                
+                # Tombol dengan desain lebar
+                submit_reg = st.form_submit_button("Daftar & Dapatkan Akses ➡️", use_container_width=True)
+                
+                if submit_reg:
+                    if not new_u or not new_p:
+                        st.warning("Isi dulu username dan passwordnya dher!")
+                    elif register_user(new_u, new_p):
+                        # Tampilan Sukses yang cakep
+                        st.markdown(f"""
+                            <div style="background-color: #dcfce7; color: #166534; padding: 15px; border-radius: 10px; border: 1px solid #bbf7d0;">
+                                <b>✅ Registrasi Berhasil!</b><br>
+                                Username <b>{new_u}</b> telah didaftarkan.
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Instruksi Pembayaran langsung muncul di bawahnya
+                        st.info("💡 **Langkah Selanjutnya:** Login menggunakan akun lo untuk melihat instruksi pembayaran dan aktivasi oleh admin.")
                     else:
-                        st.error("Username sudah terdaftar atau terjadi gangguan.")
+                        st.error("Username sudah terdaftar dher, cari nama lain!")
+        
+            # Footer kecil di bawah form
+            st.markdown("""
+                <p style="text-align: center; font-size: 0.8rem; color: #94a3b8;">
+                    Pastikan data yang lo masukin bener buat proses sinkronisasi database.
+                </p>
+            """, unsafe_allow_html=True)
         
         # Nama IG Temen lo di Dashboard Login
         st.markdown("""
