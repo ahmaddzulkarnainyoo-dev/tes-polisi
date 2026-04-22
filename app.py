@@ -705,7 +705,7 @@ def show_auth():
                 <div class="payment-card" style="margin-top:18px;">
                     <h4>💳 Cara Aktivasi Akun</h4>
                     <div class="payment-row">1️⃣  Daftar dan <strong>Login</strong> dengan akun baru lo</div>
-                    <div class="payment-row">2️⃣  Transfer ke <strong>BRI: 1234-5678-9012-3456</strong><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a.n. Growing Together — <strong>Rp 25.000</strong></div>
+                    <div class="payment-row">2️⃣  Transfer ke <strong> SEABANK: 901018867564 </strong><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a.n. ALAN RINANDO — <strong>Rp 25.000</strong></div>
                     <div class="payment-row">3️⃣  Kirim bukti transfer ke WA: <strong>0853-6637-4530</strong></div>
                     <div class="payment-row">✅  Akun diaktifkan admin <strong>dalam 1×24 jam</strong></div>
                 </div>
