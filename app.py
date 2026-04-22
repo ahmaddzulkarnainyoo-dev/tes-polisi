@@ -1026,3 +1026,81 @@ else:
                 </div>
             </div>
         """, unsafe_allow_html=True)
+# ... (sambungan kode lo yang kepotong di show_simulation) ...
+        with st.form(key=f"form_soal_{st.session_state.step}_{sesi}"):
+            pilihan = st.radio("Pilih jawaban:", soal['opsi'], label_visibility="collapsed")
+            # Perbaikan penulisan parameter yang terpotong: use_container_width=True
+            submit  = st.form_submit_button("Konfirmasi Jawaban →", use_container_width=True)
+
+            if submit:
+                # Logika cek jawaban (sesuaikan dengan struktur data soal lo)
+                jawaban_benar = soal.get('jawaban_benar', '') # pastikan key ini ada di return generator lo
+                if pilihan == jawaban_benar:
+                    st.session_state.skor += 10
+                
+                st.session_state.step += 1
+                st.session_state.end_time = time.time() + 30
+                if st.session_state.step <= 10:
+                    st.session_state.soal_aktif = generate_kecermatan() if sesi == "Kecermatan" else generate_soal_ai(sesi)
+                st.rerun()
+
+    # Tampilan Skor Akhir
+    else:
+        st.markdown(f"""
+            <div class="score-card">
+                <div class="score-label">Skor {sesi} Lo</div>
+                <div class="score-num">{st.session_state.skor}</div>
+                <div>Simulasi Selesai!</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("Kembali ke Dashboard Utama"):
+            st.session_state.step = 1 # reset step
+            st.session_state.skor = 0
+            st.session_state.page = "home" # kembali ke home
+            st.rerun()
+
+
+# ============================================================
+# 5. MAIN ROUTING (Otak Navigasi Aplikasi)
+# ============================================================
+def main():
+    # Inisialisasi status login jika belum ada
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+
+    # Inisialisasi halaman aktif (default ke home jika sudah login)
+    if "page" not in st.session_state:
+        st.session_state.page = "home"
+
+    # LOGIKA NAVIGASI
+    if not st.session_state.logged_in:
+        show_auth()
+    else:
+        # Bikin Sidebar untuk Menu Navigasi
+        with st.sidebar:
+            st.markdown(f"**👤 {st.session_state.username}**")
+            st.divider()
+            
+            if st.button("🏠 Dashboard Utama", use_container_width=True):
+                st.session_state.page = "home"
+                st.rerun()
+                
+            if st.button("📝 Mulai Simulasi", use_container_width=True):
+                st.session_state.page = "simulasi"
+                st.rerun()
+                
+            st.divider()
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state.logged_in = False
+                st.rerun()
+
+        # Render halaman sesuai state 'page'
+        if st.session_state.page == "home":
+            show_home()
+        elif st.session_state.page == "simulasi":
+            show_simulation()
+
+# Panggil fungsi utama untuk menjalankan aplikasi
+if __name__ == "__main__":
+    main()
