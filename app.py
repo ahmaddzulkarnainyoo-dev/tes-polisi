@@ -1,10 +1,10 @@
 import streamlit as st
 import time
-from engine import generate_soal_ai 
+from engine import generate_soal_ai, generate_kecermatan
 from database import supabase
 
 # --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Psychotech Polri", page_icon="🛡️")
+st.set_page_config(page_title="Psychotech Polri", page_icon="🛡️", layout="wide")
 
 # --- CSS CUSTOM ---
 st.markdown("""
@@ -12,7 +12,7 @@ st.markdown("""
     .stApp { background-color: #f8f9fa; }
     .hero-container {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        padding: 50px 20px;
+        padding: 40px 20px;
         border-radius: 20px;
         color: white;
         text-align: center;
@@ -25,107 +25,135 @@ st.markdown("""
         border-radius: 15px;
         text-align: center;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        height: 100%;
+        margin-bottom: 20px;
     }
-    .card-icon { font-size: 40px; margin-bottom: 10px; }
-    .card-title { font-weight: bold; color: #1e3a8a; }
+    .ig-credit {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 14px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNGSI AUTH (LOGIN/DAFTAR) ---
+# --- FUNGSI AUTH (Satu Fungsi untuk Semua) ---
 def login_user(username, password):
     res = supabase.table("users").select("*").eq("username", username).eq("password", password).execute()
-    return res.data[0] if res.data else None
+    if res.data:
+        user = res.data[0]
+        if user.get('status') == 'pending':
+            st.warning("⚠️ Akun lo belum aktif, bro. Selesaikan pembayaran dulu.")
+            st.info("Kirim bukti bayar ke WA: 0812-xxxx-xxxx")
+            st.stop()
+        return user
+    return None
 
 def register_user(username, password):
     try:
-        supabase.table("users").insert({"username": username, "password": password}).execute()
+        # Default status adalah 'pending'
+        supabase.table("users").insert({"username": username, "password": password, "status": "pending"}).execute()
         return True
     except:
         return False
 
 def show_auth():
     st.markdown('<div class="hero-container"><h1>🛡️ Akses Psychotech</h1><p>Masuk untuk memulai simulasi</p></div>', unsafe_allow_html=True)
-    tab1, tab2 = st.tabs(["Login", "Daftar Akun"])
     
-    with tab1:
-        with st.form("login_form"):
-            u = st.text_input("Username")
-            p = st.text_input("Password", type="password")
-            if st.form_submit_button("Masuk"):
-                user = login_user(u, p)
-                if user:
-                    st.session_state.logged_in = True
-                    st.session_state.username = u
-                    st.rerun()
-                else:
-                    st.error("Username atau Password salah!")
-def login_user(username, password):
-    res = supabase.table("users").select("*").eq("username", username).eq("password", password).execute()
-    if res.data:
-        user = res.data[0]
-        if user['status'] == 'pending':
-            st.warning("⚠️ Akun lo belum aktif, bro. Selesaikan pembayaran dulu.")
-            st.info("Kirim bukti bayar ke WA: 0812-xxxx-xxxx")
-            st.stop() # Berhenti di sini, ga bakal masuk ke menu
-        return user
-    return None
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        tab1, tab2 = st.tabs(["🔑 Login", "📝 Daftar Akun"])
+        
+        with tab1:
+            with st.form("login_form"):
+                u = st.text_input("Username")
+                p = st.text_input("Password", type="password")
+                if st.form_submit_button("Masuk"):
+                    user = login_user(u, p)
+                    if user:
+                        st.session_state.logged_in = True
+                        st.session_state.username = u
+                        st.rerun()
+                    else:
+                        st.error("Username atau Password salah!")
 
-    with tab2:
-        with st.form("reg_form"):
-            new_u = st.text_input("Username Baru")
-            new_p = st.text_input("Password Baru", type="password")
-            if st.form_submit_button("Daftar"):
-                if register_user(new_u, new_p):
-                    st.success("Akun berhasil dibuat! Silakan login.")
-                else:
-                    st.error("Username sudah terdaftar.")
+        with tab2:
+            with st.form("reg_form"):
+                new_u = st.text_input("Username Baru")
+                new_p = st.text_input("Password Baru", type="password")
+                if st.form_submit_button("Daftar Akun"):
+                    if register_user(new_u, new_p):
+                        st.success("Akun berhasil dibuat! Status: Pending. Silakan hubungi admin.")
+                    else:
+                        st.error("Username sudah terdaftar atau terjadi gangguan.")
+        
+        # Nama IG Temen lo di Dashboard Login
+        st.markdown("""
+            <div class="ig-credit">
+                🚀 <b>Project Development</b><br>
+                <a href="https://www.instagram.com/growing_together369" target="_blank" style="text-decoration:none;color:#E1306C;font-weight:bold;">
+                    Made by @growing_together369
+                </a>
+            </div>
+        """, unsafe_allow_html=True)
 
-# --- FUNGSI SIMULASI & TIMER ---
+# --- FUNGSI SIMULASI ---
 def show_simulation():
-    st.subheader(f"Sesi: {st.session_state.username}")
-    
-    if 'step' not in st.session_state:
+    # Pilih Sesi di dalam menu simulasi
+    sesi = st.selectbox("Pilih Sesi Ujian:", ["Kecerdasan", "Kecermatan", "Kepribadian"])
+    st.divider()
+
+    if 'step' not in st.session_state or st.session_state.get('current_sesi') != sesi:
         st.session_state.step = 1
         st.session_state.skor = 0
-        st.session_state.soal_aktif = generate_soal_ai()
-        st.session_state.end_time = time.time() + 30 # 30 detik per soal
+        st.session_state.current_sesi = sesi
+        st.session_state.end_time = time.time() + 30
+        if sesi == "Kecermatan":
+            st.session_state.soal_aktif = generate_kecermatan()
+        else:
+            st.session_state.soal_aktif = generate_soal_ai(sesi)
 
-    TOTAL_SOAL = 10
+    # Logika Timer
+    remaining = int(st.session_state.end_time - time.time())
+    if remaining <= 0:
+        st.warning("⏰ Waktu habis!")
+        time.sleep(1)
+        st.session_state.step += 1
+        st.session_state.end_time = time.time() + 30
+        st.session_state.soal_aktif = generate_kecermatan() if sesi == "Kecermatan" else generate_soal_ai(sesi)
+        st.rerun()
 
-    if st.session_state.step <= TOTAL_SOAL:
-        # Logika Timer Manual (Sidebar)
-        remaining = int(st.session_state.end_time - time.time())
-        if remaining <= 0:
-            st.warning("⏰ Waktu habis! Lanjut ke soal berikutnya.")
-            time.sleep(1)
-            st.session_state.step += 1
-            st.session_state.soal_aktif = generate_soal_ai()
-            st.session_state.end_time = time.time() + 30
-            st.rerun()
+    st.sidebar.metric("⏳ Sisa Waktu", f"{remaining} detik")
 
-        st.sidebar.metric("⏳ Sisa Waktu", f"{remaining} detik")
-        
+    if st.session_state.step <= 10:
         soal = st.session_state.soal_aktif
-        st.write(f"**Soal {st.session_state.step} / {TOTAL_SOAL}**")
         
-        with st.form(key=f"form_{st.session_state.step}"):
+        if sesi == "Kecermatan":
+            st.markdown("### 📋 TABEL KUNCI")
+            cols = st.columns(5)
+            for i, char in enumerate(soal['kunci']):
+                cols[i].info(f"**{char}**")
+            st.write(f"**Soal {st.session_state.step}:** Karakter apa yang hilang dari: `{soal['pertanyaan']}`?")
+        else:
+            st.write(f"**Soal {st.session_state.step} ({sesi})**")
             st.write(soal['pertanyaan'])
-            pilihan = st.radio("Jawaban:", soal['opsi'])
+
+        with st.form(key=f"form_{st.session_state.step}"):
+            pilihan = st.radio("Pilih Jawaban:", soal['opsi'])
             if st.form_submit_button("Lanjut ➡️"):
-                if pilihan == soal['jawaban']:
+                # Hitung skor (Kecerdasan/Kecermatan pakai jawaban benar, Kepribadian pakai bobot)
+                if sesi == "Kepribadian":
+                    idx = soal['opsi'].index(pilihan)
+                    st.session_state.skor += soal['skor'][idx]
+                elif pilihan == soal['jawaban']:
                     st.session_state.skor += 10
+                
                 st.session_state.step += 1
-                if st.session_state.step <= TOTAL_SOAL:
-                    st.session_state.soal_aktif = generate_soal_ai()
-                    st.session_state.end_time = time.time() + 30
+                st.session_state.end_time = time.time() + 30
+                st.session_state.soal_aktif = generate_kecermatan() if sesi == "Kecermatan" else generate_soal_ai(sesi)
                 st.rerun()
     else:
-        st.balloons()
-        st.success(f"Tes Selesai! Skor: {st.session_state.skor}")
-        if st.button("Ulangi Tes"):
-            for k in ['step', 'skor', 'soal_aktif', 'end_time']: 
-                if k in st.session_state: del st.session_state[k]
+        st.success(f"Sesi {sesi} Selesai! Skor lo: {st.session_state.skor}")
+        if st.button("Ulangi Sesi"):
+            del st.session_state.step
             st.rerun()
 
 def show_home():
@@ -136,14 +164,9 @@ def show_home():
         </div>
     """, unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown('<div class="nav-card"><h3>📝</h3><b>Uji Kompetensi</b><p>Satu soal per halaman.</p></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown('<div class="nav-card"><h3>🛡️</h3><b>Standar Presisi</b><p>Sesuai kisi-kisi terbaru.</p></div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown('<div class="nav-card"><h3>📊</h3><b>Skor Real-time</b><p>Evaluasi langsung.</p></div>', unsafe_allow_html=True)
+    # ... isi nav-card lo ...
 
-# --- SIDEBAR & ROUTING ---
+# --- ROUTING UTAMA ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -152,20 +175,7 @@ if not st.session_state.logged_in:
 else:
     st.sidebar.title("🛡️ Panel Navigasi")
     menu = st.sidebar.radio("Pilih Menu", ["Home", "Mulai Simulasi", "Dashboard Admin"])
-
-if sesi == "Kecermatan":
-    soal = generate_kecermatan()
-    # Tampilkan KUNCI dengan kotak-kotak rapi
-    st.markdown("### TABEL KUNCI")
-    cols = st.columns(5)
-    for i, char in enumerate(soal['kunci']):
-        cols[i].markdown(f"**{char}**")
     
-    st.divider()
-    st.subheader(f"Soal: {soal['pertanyaan']}")
-    # Opsi jawabannya adalah 5 karakter di kunci tadi
-    pilihan = st.radio("Karakter mana yang hilang?", soal['opsi'])    
-    # Credit IG Temen lo
     st.sidebar.markdown("---")
     st.sidebar.write("🚀 **Project Development**")
     st.sidebar.markdown('<a href="https://www.instagram.com/growing_together369" target="_blank" style="text-decoration:none;color:#E1306C;font-weight:bold;">Made by @growing_together369</a>', unsafe_allow_html=True)
@@ -177,8 +187,4 @@ if sesi == "Kecermatan":
     if menu == "Home": show_home()
     elif menu == "Mulai Simulasi": show_simulation()
     elif menu == "Dashboard Admin":
-        try:
-            import admin
-            admin.show_admin_panel()
-        except:
-            st.error("Gagal memuat panel admin.")
+        st.info("Halaman Admin dalam pengembangan.")
