@@ -631,7 +631,7 @@ def login_user(username, password):
                     <h4>⏳ Akun Belum Aktif</h4>
                     <div class="payment-row">📱 <span>Kirim bukti bayar via <strong>WhatsApp</strong></span></div>
                     <div class="payment-row">📞 <strong>0853-6637-4530</strong></div>
-                    <div class="payment-row">🏦 Rekening <strong>BRI: 1234-5678-9012-3456</strong> a.n. Growing Together</div>
+                    <div class="payment-row">🏦 Rekening <strong>SEABANK: 901018867564</strong> a.n. ALAN RINANDO </div>
                     <div class="payment-row">💰 Biaya Aktivasi: <strong>Rp 25.000</strong></div>
                 </div>
             """, unsafe_allow_html=True)
