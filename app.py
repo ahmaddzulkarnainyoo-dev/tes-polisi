@@ -60,6 +60,16 @@ def show_auth():
                     st.rerun()
                 else:
                     st.error("Username atau Password salah!")
+def login_user(username, password):
+    res = supabase.table("users").select("*").eq("username", username).eq("password", password).execute()
+    if res.data:
+        user = res.data[0]
+        if user['status'] == 'pending':
+            st.warning("⚠️ Akun lo belum aktif, bro. Selesaikan pembayaran dulu.")
+            st.info("Kirim bukti bayar ke WA: 0812-xxxx-xxxx")
+            st.stop() # Berhenti di sini, ga bakal masuk ke menu
+        return user
+    return None
 
     with tab2:
         with st.form("reg_form"):
