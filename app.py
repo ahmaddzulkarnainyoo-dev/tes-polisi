@@ -152,7 +152,19 @@ if not st.session_state.logged_in:
 else:
     st.sidebar.title("🛡️ Panel Navigasi")
     menu = st.sidebar.radio("Pilih Menu", ["Home", "Mulai Simulasi", "Dashboard Admin"])
+
+if sesi == "Kecermatan":
+    soal = generate_kecermatan()
+    # Tampilkan KUNCI dengan kotak-kotak rapi
+    st.markdown("### TABEL KUNCI")
+    cols = st.columns(5)
+    for i, char in enumerate(soal['kunci']):
+        cols[i].markdown(f"**{char}**")
     
+    st.divider()
+    st.subheader(f"Soal: {soal['pertanyaan']}")
+    # Opsi jawabannya adalah 5 karakter di kunci tadi
+    pilihan = st.radio("Karakter mana yang hilang?", soal['opsi'])    
     # Credit IG Temen lo
     st.sidebar.markdown("---")
     st.sidebar.write("🚀 **Project Development**")
