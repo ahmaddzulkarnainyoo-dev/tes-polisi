@@ -1,1028 +1,1477 @@
+"""
+app.py — Psychotech Polri | Arena Kompetisi CAT
+Rebuilt: Dark Military aesthetic, stable timer, 4 sesi synced with engine.py
+"""
+
 import streamlit as st
 import time
-from engine import generate_soal_ai, generate_kecermatan
+from engine import (
+    generate_soal_kecerdasan,
+    generate_soal_kepribadian,
+    generate_kecermatan,
+    generate_pass_hand,
+    hitung_aps,
+    hitung_ketahanan,
+    catat_waktu_jawab,
+    nilai_jawaban_kecerdasan,
+    nilai_jawaban_kepribadian,
+    nilai_jawaban_kecermatan,
+    posisi_target_acak,
+)
 from database import supabase
 
-# --- KONFIGURASI HALAMAN ---
+# ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="Psychotech Polri | Simulasi CAT Profesional",
+    page_title="Psychotech Polri | Arena CAT",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
-# ============================================================
-# 1. MODERN CSS INJECTOR — Glassmorphism + Elite Blue-White
-# ============================================================
+# ══════════════════════════════════════════════
+# CSS — DARK ARENA / MILITARY COMMAND
+# ══════════════════════════════════════════════
 st.markdown("""
 <style>
-/* ── Google Font Import ── */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Sora:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@300;400;500;600&display=swap');
 
-/* ── Root Variables ── */
 :root {
-    --primary:        #1d4ed8;
-    --primary-dark:   #1e3a8a;
-    --primary-light:  #3b82f6;
-    --accent:         #06b6d4;
-    --accent-gold:    #f59e0b;
-    --bg-base:        #f0f4ff;
-    --bg-card:        rgba(255, 255, 255, 0.65);
-    --bg-card-dark:   rgba(255, 255, 255, 0.30);
-    --border-glass:   rgba(255, 255, 255, 0.50);
-    --text-primary:   #0f172a;
-    --text-muted:     #64748b;
-    --text-white:     #ffffff;
-    --shadow-soft:    0 8px 32px rgba(29, 78, 216, 0.10);
-    --shadow-card:    0 4px 20px rgba(0, 0, 0, 0.07);
-    --radius-lg:      20px;
-    --radius-md:      14px;
-    --radius-sm:      10px;
-    --blur:           blur(18px);
+    --bg-void:      #080c10;
+    --bg-panel:     #0d1117;
+    --bg-surface:   #161b22;
+    --bg-elevated:  #1c2128;
+    --border-dim:   rgba(255,255,255,0.06);
+    --border-glow:  rgba(251,107,0,0.35);
+    --accent:       #fb6b00;
+    --accent-dim:   rgba(251,107,0,0.15);
+    --accent-ember: #ff3c00;
+    --green-ok:     #39d353;
+    --red-alert:    #f85149;
+    --gold:         #e3b341;
+    --text-pri:     #e6edf3;
+    --text-sec:     #7d8590;
+    --text-dim:     #484f58;
+    --mono:         'JetBrains Mono', monospace;
+    --display:      'Barlow Condensed', sans-serif;
+    --body:         'Barlow', sans-serif;
+    --r-sm:         6px;
+    --r-md:         10px;
+    --r-lg:         16px;
 }
 
-/* ── Global Base ── */
 html, body, [class*="css"] {
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    background-color: var(--bg-base) !important;
+    font-family: var(--body) !important;
+    background-color: var(--bg-void) !important;
+    color: var(--text-pri) !important;
 }
 
 .stApp {
     background:
-        radial-gradient(ellipse at 15% 20%, rgba(59, 130, 246, 0.12) 0%, transparent 55%),
-        radial-gradient(ellipse at 85% 75%, rgba(6, 182, 212, 0.10) 0%, transparent 55%),
-        var(--bg-base) !important;
+        radial-gradient(ellipse at 20% 0%, rgba(251,107,0,0.07) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(57,211,83,0.04) 0%, transparent 45%),
+        var(--bg-void) !important;
     min-height: 100vh;
 }
 
-/* ── Hide default Streamlit chrome ── */
 #MainMenu, footer, header { visibility: hidden; }
-.block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; }
+.block-container {
+    padding-top: 1.2rem !important;
+    padding-bottom: 3rem !important;
+    max-width: 1200px !important;
+}
 
-/* ── Glassmorphism Card ── */
-.glass-card {
-    background: var(--bg-card);
-    backdrop-filter: var(--blur);
-    -webkit-backdrop-filter: var(--blur);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-soft);
+/* ── Scanline overlay ── */
+.stApp::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+}
+
+/* ── Panels ── */
+.panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-lg);
     padding: 28px;
     margin-bottom: 20px;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
-.glass-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 16px 40px rgba(29, 78, 216, 0.14);
+.panel-elevated {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-md);
+    padding: 20px;
 }
 
-/* ── Hero Section ── */
-.hero-wrap {
-    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 45%, #06b6d4 100%);
-    border-radius: var(--radius-lg);
-    padding: 56px 32px;
-    text-align: center;
+/* ── Hero / Command Banner ── */
+.hero-command {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1a1f2e 100%);
+    border: 1px solid var(--border-dim);
+    border-top: 2px solid var(--accent);
+    border-radius: var(--r-lg);
+    padding: 48px 36px 40px;
     position: relative;
     overflow: hidden;
-    margin-bottom: 32px;
-    box-shadow: 0 20px 60px rgba(29, 78, 216, 0.30);
+    margin-bottom: 28px;
 }
-.hero-wrap::before {
-    content: '';
+.hero-command::before {
+    content: 'PSYCHOTECH';
     position: absolute;
-    top: -60px; right: -60px;
-    width: 280px; height: 280px;
-    background: rgba(255,255,255,0.06);
-    border-radius: 50%;
+    right: -20px; top: -10px;
+    font-family: var(--display);
+    font-size: 9rem;
+    font-weight: 900;
+    color: rgba(255,255,255,0.02);
+    line-height: 1;
     pointer-events: none;
+    letter-spacing: -4px;
 }
-.hero-wrap::after {
-    content: '';
-    position: absolute;
-    bottom: -80px; left: -40px;
-    width: 240px; height: 240px;
-    background: rgba(6, 182, 212, 0.12);
-    border-radius: 50%;
-    pointer-events: none;
-}
-.hero-badge {
-    display: inline-block;
-    background: rgba(255,255,255,0.18);
-    border: 1px solid rgba(255,255,255,0.35);
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    padding: 6px 16px;
-    border-radius: 999px;
-    margin-bottom: 18px;
-}
-.hero-title {
-    font-family: 'Sora', sans-serif;
-    font-size: clamp(2rem, 5vw, 3.2rem);
-    font-weight: 800;
-    color: #fff;
-    line-height: 1.15;
-    margin: 0 0 14px;
-    text-shadow: 0 2px 20px rgba(0,0,0,0.20);
-}
-.hero-sub {
-    font-size: 1.05rem;
-    color: rgba(255,255,255,0.85);
-    margin: 0 0 32px;
-    font-weight: 400;
-}
-
-/* ── Trust Signal Stats ── */
-.stats-row {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-top: 10px;
-    position: relative;
-    z-index: 1;
-}
-.stat-pill {
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.30);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-radius: 999px;
-    padding: 10px 22px;
-    text-align: center;
-    color: #fff;
-}
-.stat-pill .stat-num {
-    font-family: 'Sora', sans-serif;
-    font-size: 1.4rem;
-    font-weight: 700;
-    display: block;
-}
-.stat-pill .stat-label {
-    font-size: 0.75rem;
-    opacity: 0.80;
-    display: block;
-    margin-top: 2px;
-}
-
-/* ── Section Title ── */
-.section-title {
-    font-family: 'Sora', sans-serif;
-    font-size: 1.55rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 6px;
-}
-.section-subtitle {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    margin: 0 0 24px;
-}
-
-/* ── News Card ── */
-.news-card {
-    background: var(--bg-card);
-    backdrop-filter: var(--blur);
-    -webkit-backdrop-filter: var(--blur);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius-md);
-    padding: 22px 20px;
-    box-shadow: var(--shadow-card);
-    height: 100%;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-    position: relative;
-    overflow: hidden;
-}
-.news-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(29,78,216,0.12);
-}
-.news-tag {
-    display: inline-block;
+.hero-rank {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-dim);
+    border: 1px solid var(--border-glow);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-family: var(--mono);
     font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 1px;
+    color: var(--accent);
+    letter-spacing: 2px;
     text-transform: uppercase;
-    padding: 4px 10px;
-    border-radius: 999px;
-    margin-bottom: 10px;
+    margin-bottom: 16px;
 }
-.tag-red    { background: #fee2e2; color: #b91c1c; }
-.tag-blue   { background: #dbeafe; color: #1d4ed8; }
-.tag-green  { background: #dcfce7; color: #166534; }
-.news-title {
-    font-family: 'Sora', sans-serif;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 8px;
-    line-height: 1.4;
+.hero-rank::before { content: '▶'; font-size: 0.5rem; }
+.hero-title {
+    font-family: var(--display);
+    font-size: clamp(2.4rem, 6vw, 4rem);
+    font-weight: 900;
+    color: var(--text-pri);
+    line-height: 1.0;
+    margin: 0 0 12px;
+    letter-spacing: -1px;
 }
-.news-body {
-    font-size: 0.83rem;
-    color: var(--text-muted);
-    line-height: 1.6;
+.hero-title span { color: var(--accent); }
+.hero-sub {
+    font-size: 1rem;
+    color: var(--text-sec);
+    margin: 0 0 28px;
+    font-weight: 300;
+    max-width: 520px;
 }
-.news-date {
-    font-size: 0.72rem;
-    color: #94a3b8;
-    margin-top: 12px;
+.stat-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.stat-chip {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-sm);
+    padding: 10px 18px;
+    text-align: center;
+    min-width: 90px;
+}
+.stat-chip .n {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--accent);
+    display: block;
+    line-height: 1;
+}
+.stat-chip .l {
+    font-size: 0.68rem;
+    color: var(--text-sec);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-top: 3px;
     display: block;
 }
 
-/* ── Testimonial Infinite Slider ── */
-.testi-section {
-    overflow: hidden;
-    position: relative;
-    padding: 12px 0;
-    mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
-}
-.testi-track {
-    display: flex;
-    gap: 16px;
-    width: max-content;
-    animation: scroll-left 38s linear infinite;
-}
-.testi-track:hover { animation-play-state: paused; }
-@keyframes scroll-left {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
-}
-.testi-card {
-    background: rgba(255,255,255,0.72);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.55);
-    border-radius: var(--radius-md);
-    padding: 18px 22px;
-    min-width: 270px;
-    max-width: 270px;
-    box-shadow: 0 4px 16px rgba(29,78,216,0.07);
-    flex-shrink: 0;
-}
-.testi-stars { color: var(--accent-gold); font-size: 0.85rem; margin-bottom: 8px; }
-.testi-text {
-    font-size: 0.83rem;
-    color: var(--text-primary);
-    line-height: 1.55;
-    margin-bottom: 12px;
-    font-style: italic;
-}
-.testi-author {
+/* ── Section header ── */
+.sec-head {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-bottom: 16px;
 }
-.testi-avatar {
-    width: 34px; height: 34px;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.75rem; font-weight: 700;
-    color: #fff;
+.sec-head-line {
+    width: 3px; height: 20px;
+    background: var(--accent);
+    border-radius: 2px;
     flex-shrink: 0;
 }
-.testi-name {
-    font-size: 0.8rem;
+.sec-head-text {
+    font-family: var(--display);
+    font-size: 1.2rem;
     font-weight: 700;
-    color: var(--text-primary);
-}
-.testi-meta {
-    font-size: 0.7rem;
-    color: var(--text-muted);
+    color: var(--text-pri);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
 }
 
-/* ── Auth Card ── */
-.auth-wrap {
-    max-width: 460px;
-    margin: 0 auto;
+/* ── Arena Cards (Sesi) ── */
+.arena-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
 }
-.auth-header {
-    text-align: center;
-    margin-bottom: 28px;
+@media (max-width: 640px) {
+    .arena-grid { grid-template-columns: 1fr; }
+    .stat-row { flex-direction: column; }
+    .stat-chip { min-width: unset; width: 100%; }
 }
-.auth-icon {
-    font-size: 3rem;
+.arena-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-md);
+    padding: 22px 20px 20px;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+.arena-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--card-accent, var(--accent));
+    opacity: 0.7;
+}
+.arena-card:hover {
+    border-color: var(--border-glow);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(251,107,0,0.12);
+}
+.arena-card .ac-icon {
+    font-size: 2rem;
     display: block;
     margin-bottom: 10px;
 }
-.auth-title {
-    font-family: 'Sora', sans-serif;
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
+.arena-card .ac-title {
+    font-family: var(--display);
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--text-pri);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
 }
-.auth-sub {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-top: 4px;
+.arena-card .ac-desc {
+    font-size: 0.8rem;
+    color: var(--text-sec);
+    line-height: 1.5;
+    margin-bottom: 14px;
+}
+.arena-card .ac-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.meta-tag {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--border-glow);
+    border-radius: 3px;
+    padding: 2px 7px;
+    text-transform: uppercase;
 }
 
-/* ── Payment Instruction Card ── */
-.payment-card {
-    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
-    border-radius: var(--radius-md);
-    padding: 22px 20px;
-    color: white;
-    margin-top: 20px;
+/* ── Leaderboard ── */
+.lb-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--body);
+    font-size: 0.88rem;
 }
-.payment-card h4 {
-    font-family: 'Sora', sans-serif;
-    font-size: 1rem;
+.lb-table th {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-dim);
+    text-align: left;
+}
+.lb-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-dim);
+    color: var(--text-pri);
+    vertical-align: middle;
+}
+.lb-table tr:last-child td { border-bottom: none; }
+.lb-table tr:hover td { background: var(--bg-elevated); }
+.lb-rank {
+    font-family: var(--mono);
     font-weight: 700;
-    margin: 0 0 14px;
-    display: flex; align-items: center; gap: 8px;
+    font-size: 0.9rem;
 }
-.payment-row {
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.20);
-    border-radius: var(--radius-sm);
-    padding: 10px 14px;
-    font-size: 0.85rem;
-    margin-bottom: 8px;
-    display: flex; align-items: center; gap: 10px;
+.lb-rank.r1 { color: var(--gold); }
+.lb-rank.r2 { color: #c0c0c0; }
+.lb-rank.r3 { color: #cd7f32; }
+.lb-rank.rx { color: var(--text-dim); }
+.lb-score {
+    font-family: var(--display);
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--accent);
 }
-.payment-row strong { font-weight: 700; }
+.lb-sesi {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-sec);
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    padding: 2px 7px;
+}
 
-/* ── Simulation ── */
-.sim-header {
-    background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
-    border-radius: var(--radius-md);
-    padding: 18px 22px;
-    color: white;
-    margin-bottom: 20px;
+/* ── Sim Header ── */
+.sim-hdr {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-dim);
+    border-top: 2px solid var(--accent);
+    border-radius: var(--r-md);
+    padding: 16px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 12px;
+    margin-bottom: 16px;
 }
-.sim-title {
-    font-family: 'Sora', sans-serif;
-    font-size: 1.1rem;
-    font-weight: 700;
+.sim-hdr-left .sesi-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
 }
-.timer-badge {
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.30);
-    border-radius: 999px;
-    padding: 6px 18px;
-    font-size: 0.9rem;
+.sim-hdr-left .sesi-title {
+    font-family: var(--display);
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-pri);
+    letter-spacing: 0.5px;
+}
+.timer-box {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-sm);
+    padding: 8px 18px;
+    font-family: var(--mono);
+    font-size: 1.5rem;
     font-weight: 700;
-    font-family: 'Sora', monospace;
-    min-width: 110px;
+    color: var(--green-ok);
+    min-width: 100px;
     text-align: center;
+    transition: color 0.3s, border-color 0.3s;
 }
-.timer-badge.urgent { background: rgba(239,68,68,0.25); border-color: rgba(239,68,68,0.50); }
+.timer-box.warn { color: var(--gold); border-color: rgba(227,179,65,0.4); }
+.timer-box.crit { color: var(--red-alert); border-color: rgba(248,81,73,0.4);
+    animation: pulse-red 0.5s ease-in-out infinite alternate; }
+@keyframes pulse-red {
+    from { box-shadow: none; }
+    to   { box-shadow: 0 0 12px rgba(248,81,73,0.35); }
+}
 
+/* ── Question Box ── */
+.q-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-md);
+    padding: 26px 24px;
+    margin-bottom: 20px;
+}
+.q-num {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+.q-text {
+    font-size: 1.02rem;
+    color: var(--text-pri);
+    line-height: 1.7;
+    font-weight: 400;
+}
+
+/* ── Kunci Grid ── */
 .kunci-grid {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
 }
-.kunci-item {
-    background: var(--bg-card);
-    backdrop-filter: var(--blur);
-    border: 1.5px solid var(--primary-light);
-    border-radius: var(--radius-sm);
-    padding: 10px 18px;
-    font-family: 'Sora', monospace;
-    font-size: 1.05rem;
+.kunci-char {
+    background: var(--bg-elevated);
+    border: 1px solid var(--accent);
+    border-radius: var(--r-sm);
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 1.1rem;
     font-weight: 700;
-    color: var(--primary-dark);
-    min-width: 48px;
+    color: var(--accent);
+    min-width: 46px;
     text-align: center;
 }
-
-.question-box {
-    background: var(--bg-card);
-    backdrop-filter: var(--blur);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius-md);
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow-card);
+.tampilan-box {
+    font-family: var(--mono);
+    font-size: 1.4rem;
+    letter-spacing: 8px;
+    color: var(--text-pri);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-sm);
+    padding: 14px 20px;
+    display: inline-block;
+    margin: 12px 0;
 }
-.question-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 1px;
+.tampilan-box .missing {
+    color: var(--red-alert);
+    font-size: 1.6rem;
+}
+
+/* ── Pass Hand ── */
+.passhand-area {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-md);
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+.ph-target-btn {
+    position: absolute;
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--accent), var(--accent-ember));
+    border: 2px solid rgba(255,255,255,0.2);
+    cursor: pointer;
+    animation: target-pulse 1.2s ease-in-out infinite;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    box-shadow: 0 0 20px rgba(251,107,0,0.5);
+    transition: transform 0.1s;
+}
+.ph-target-btn:active { transform: scale(0.9); }
+@keyframes target-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(251,107,0,0.4); }
+    50%       { box-shadow: 0 0 28px rgba(251,107,0,0.8); }
+}
+.ph-counter {
+    font-family: var(--display);
+    font-size: 5rem;
+    font-weight: 900;
+    color: var(--accent);
+    text-align: center;
+    line-height: 1;
+}
+.ph-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-sec);
+    text-align: center;
+    letter-spacing: 2px;
     text-transform: uppercase;
-    color: var(--primary-light);
-    margin-bottom: 8px;
-}
-.question-text {
-    font-size: 1rem;
-    color: var(--text-primary);
-    line-height: 1.65;
-    font-weight: 500;
+    margin-top: 6px;
 }
 
-/* ── Streamlit Widget Overrides ── */
+/* ── Score Result ── */
+.result-box {
+    background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-surface) 100%);
+    border: 1px solid var(--border-glow);
+    border-top: 3px solid var(--accent);
+    border-radius: var(--r-lg);
+    padding: 44px 32px;
+    text-align: center;
+}
+.result-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+.result-score {
+    font-family: var(--display);
+    font-size: 5.5rem;
+    font-weight: 900;
+    color: var(--text-pri);
+    line-height: 1;
+    margin: 8px 0 4px;
+}
+.result-verdict {
+    font-size: 1rem;
+    color: var(--text-sec);
+    margin-top: 8px;
+}
+.result-bar-wrap {
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    height: 6px;
+    max-width: 300px;
+    margin: 18px auto 0;
+    overflow: hidden;
+}
+.result-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-ember));
+    transition: width 0.8s ease;
+}
+
+/* ── Auth ── */
+.auth-shell {
+    max-width: 420px;
+    margin: 60px auto 0;
+}
+.auth-logo {
+    text-align: center;
+    margin-bottom: 28px;
+}
+.auth-logo .badge {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: block;
+}
+.auth-logo .name {
+    font-family: var(--display);
+    font-size: 2.4rem;
+    font-weight: 900;
+    color: var(--text-pri);
+    letter-spacing: -1px;
+}
+.auth-logo .name span { color: var(--accent); }
+.auth-logo .sub {
+    font-size: 0.82rem;
+    color: var(--text-sec);
+    margin-top: 4px;
+}
+
+/* ── Payment Steps ── */
+.pay-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-glow);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--r-md);
+    padding: 18px 16px;
+    margin-top: 16px;
+}
+.pay-box h5 {
+    font-family: var(--display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 12px;
+}
+.pay-row {
+    font-size: 0.82rem;
+    color: var(--text-sec);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-dim);
+    display: flex;
+    gap: 8px;
+}
+.pay-row:last-child { border-bottom: none; }
+.pay-row strong { color: var(--text-pri); }
+
+/* ── Progress Bar ── */
+.prog-wrap {
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    height: 4px;
+    margin-bottom: 18px;
+    overflow: hidden;
+}
+.prog-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-ember));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+/* ── Streamlit overrides ── */
 .stButton > button {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-    color: white !important;
+    background: var(--accent) !important;
+    color: #000 !important;
     border: none !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 10px 24px !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-weight: 600 !important;
-    font-size: 0.9rem !important;
-    transition: all 0.2s ease !important;
-    box-shadow: 0 4px 14px rgba(29, 78, 216, 0.30) !important;
+    border-radius: var(--r-sm) !important;
+    font-family: var(--display) !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px !important;
+    text-transform: uppercase !important;
+    padding: 10px 22px !important;
+    transition: all 0.15s ease !important;
     width: 100%;
 }
 .stButton > button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 20px rgba(29, 78, 216, 0.40) !important;
-    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%) !important;
+    background: var(--accent-ember) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 18px rgba(251,107,0,0.35) !important;
 }
 .stTextInput > div > div > input {
-    border-radius: var(--radius-sm) !important;
-    border: 1.5px solid #e2e8f0 !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-dim) !important;
+    border-radius: var(--r-sm) !important;
+    color: var(--text-pri) !important;
+    font-family: var(--body) !important;
     font-size: 0.9rem !important;
     padding: 10px 14px !important;
-    transition: border-color 0.2s !important;
-    background: rgba(255,255,255,0.8) !important;
 }
 .stTextInput > div > div > input:focus {
-    border-color: var(--primary-light) !important;
-    box-shadow: 0 0 0 3px rgba(59,130,246,0.12) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px var(--accent-dim) !important;
+}
+.stTextInput > label, .stSelectbox > label, .stRadio > label {
+    color: var(--text-sec) !important;
+    font-size: 0.8rem !important;
+    font-family: var(--mono) !important;
+    letter-spacing: 1px !important;
+    text-transform: uppercase !important;
+}
+.stSelectbox > div > div {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-dim) !important;
+    border-radius: var(--r-sm) !important;
+    color: var(--text-pri) !important;
 }
 .stTabs [data-baseweb="tab-list"] {
-    background: rgba(255,255,255,0.50) !important;
-    border-radius: var(--radius-sm) !important;
+    background: var(--bg-elevated) !important;
+    border-radius: var(--r-sm) !important;
     padding: 4px !important;
     gap: 4px !important;
-    border: 1px solid rgba(255,255,255,0.60) !important;
+    border: 1px solid var(--border-dim) !important;
 }
 .stTabs [data-baseweb="tab"] {
-    border-radius: 8px !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-weight: 600 !important;
-    font-size: 0.85rem !important;
+    border-radius: 5px !important;
+    font-family: var(--display) !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    color: var(--text-sec) !important;
     padding: 8px 16px !important;
 }
 .stTabs [aria-selected="true"] {
-    background: white !important;
-    color: var(--primary) !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
-}
-.stSelectbox > div > div {
-    border-radius: var(--radius-sm) !important;
-    border: 1.5px solid #e2e8f0 !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
-    background: rgba(255,255,255,0.80) !important;
+    background: var(--bg-panel) !important;
+    color: var(--accent) !important;
+    border: 1px solid var(--border-glow) !important;
 }
 .stRadio > div { gap: 8px !important; }
 .stRadio label {
-    background: rgba(255,255,255,0.65) !important;
-    border: 1.5px solid #e2e8f0 !important;
-    border-radius: var(--radius-sm) !important;
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-dim) !important;
+    border-radius: var(--r-sm) !important;
     padding: 10px 14px !important;
-    transition: all 0.2s !important;
+    color: var(--text-pri) !important;
+    font-family: var(--body) !important;
+    font-size: 0.9rem !important;
+    transition: all 0.15s !important;
     cursor: pointer !important;
 }
 .stRadio label:hover {
-    border-color: var(--primary-light) !important;
-    background: rgba(219,234,254,0.50) !important;
+    border-color: var(--border-glow) !important;
+    background: var(--bg-surface) !important;
 }
 .stSidebar {
-    background: rgba(255,255,255,0.70) !important;
-    backdrop-filter: var(--blur) !important;
-    border-right: 1px solid rgba(255,255,255,0.50) !important;
+    background: var(--bg-panel) !important;
+    border-right: 1px solid var(--border-dim) !important;
 }
-/* Alert overrides */
-.stSuccess, .stWarning, .stInfo, .stError {
-    border-radius: var(--radius-sm) !important;
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
+.stAlert, .stSuccess, .stWarning, .stInfo, .stError {
+    border-radius: var(--r-sm) !important;
+    font-family: var(--body) !important;
+}
+div[data-testid="stProgress"] > div {
+    background: var(--bg-elevated) !important;
+}
+div[data-testid="stProgress"] > div > div {
+    background: var(--accent) !important;
 }
 
-/* ── Footer credit ── */
-.ig-credit-box {
+/* ── Responsive sim layout ── */
+@media (max-width: 640px) {
+    .sim-hdr { flex-direction: column; align-items: flex-start; }
+    .kunci-grid { gap: 6px; }
+    .kunci-char { min-width: 38px; padding: 8px 10px; font-size: 0.95rem; }
+    .result-score { font-size: 4rem; }
+    .ph-counter { font-size: 3.5rem; }
+}
+
+/* ── Footer ── */
+.footer-credit {
     text-align: center;
-    padding: 20px;
-    color: var(--text-muted);
-    font-size: 0.82rem;
+    padding: 24px 0 8px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
 }
-.ig-credit-box a {
-    color: #E1306C;
-    font-weight: 700;
-    text-decoration: none;
-}
-.ig-credit-box a:hover { text-decoration: underline; }
-
-/* ── Score Result Card ── */
-.score-card {
-    background: linear-gradient(135deg, #1e3a8a 0%, #06b6d4 100%);
-    border-radius: var(--radius-lg);
-    padding: 36px;
-    text-align: center;
-    color: white;
-    box-shadow: 0 16px 40px rgba(29,78,216,0.25);
-}
-.score-num {
-    font-family: 'Sora', sans-serif;
-    font-size: 4rem;
-    font-weight: 800;
-    line-height: 1;
-    margin: 12px 0;
-}
-.score-label {
-    font-size: 0.9rem;
-    opacity: 0.85;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-/* ── Nav Cards ── */
-.nav-card-wrap {
-    background: var(--bg-card);
-    backdrop-filter: var(--blur);
-    border: 1px solid var(--border-glass);
-    border-radius: var(--radius-md);
-    padding: 28px 20px;
-    text-align: center;
-    box-shadow: var(--shadow-card);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-    height: 100%;
-}
-.nav-card-wrap:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(29,78,216,0.13);
-}
-.nav-icon { font-size: 2.4rem; display: block; margin-bottom: 10px; }
-.nav-title {
-    font-family: 'Sora', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 6px;
-}
-.nav-desc { font-size: 0.8rem; color: var(--text-muted); }
-
-/* ── Responsive ── */
-@media (max-width: 768px) {
-    .hero-wrap { padding: 36px 18px; }
-    .stats-row { gap: 10px; }
-    .stat-pill .stat-num { font-size: 1.2rem; }
-    .kunci-grid { gap: 8px; }
-    .kunci-item { min-width: 42px; padding: 8px 12px; font-size: 0.95rem; }
-    .sim-header { padding: 14px 16px; }
-}
+.footer-credit a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.footer-credit a:hover { color: var(--accent-ember); }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ============================================================
-# HELPER: Testimonial Slider Data
-# ============================================================
-TESTIMONIALS = [
-    {"name": "adli66",         "role": "Casis Brimob 2024", "color": "#1d4ed8", "text": "Platform ini keren banget, soal-soalnya mirip banget sama yang keluar aslinya. Lolos psikotes berkat latihan sini tiap hari!"},
-    {"name": "rivaldo_polri",  "role": "Polda Sumut",        "color": "#0891b2", "text": "Timer-nya bikin deg-degan, persis kayak kondisi ujian beneran. Mental jadi lebih siap."},
-    {"name": "bayu_perkasa",   "role": "Akademi Polisi",     "color": "#7c3aed", "text": "Soal kecermatannya challenging banget, tapi setelah rutin latihan di sini, nilai gue naik drastis."},
-    {"name": "nadia_casis",    "role": "Polda Jabar",        "color": "#059669", "text": "Fitur kepribadiannya bagus, ngebantu gue ngerti pola jawaban yang tepat untuk profil polri."},
-    {"name": "rafi_pratama",   "role": "Casis Polri 2025",   "color": "#dc2626", "text": "Udah coba banyak aplikasi simulasi, tapi yang ini paling mirip sama format aslinya. Highly recommended!"},
-    {"name": "syahrul_ok",     "role": "Polda Kaltim",       "color": "#d97706", "text": "Admin responsif, ada masalah langsung dibantu. Akun aktif cepet. Simulasinya juga update terus."},
-    {"name": "dewi_aulia22",   "role": "Polwan Seleksi",     "color": "#db2777", "text": "Sebagai calon polwan, soal-soalnya relevan dan penjelasannya mudah dipahami. Dapet insight baru tiap sesi."},
-    {"name": "handoko_bravo",  "role": "Polda Jateng",       "color": "#0f766e", "text": "Latihan kecerdasan di sini bikin kemampuan analitik gue makin tajam. Worth every penny!"},
-]
-
-def render_testimonial_slider():
-    doubled = TESTIMONIALS * 2  # duplicate for seamless loop
-    cards_html = ""
-    for t in doubled:
-        initials = "".join(w[0].upper() for w in t["name"].replace("_", " ").split()[:2])
-        cards_html += f"""
-        <div class="testi-card">
-            <div class="testi-stars">★★★★★</div>
-            <p class="testi-text">"{t['text']}"</p>
-            <div class="testi-author">
-                <div class="testi-avatar" style="background:{t['color']};">{initials}</div>
-                <div>
-                    <div class="testi-name">@{t['name']}</div>
-                    <div class="testi-meta">{t['role']}</div>
-                </div>
-            </div>
-        </div>
-        """
-    st.markdown(f"""
-        <div class="testi-section">
-            <div class="testi-track">{cards_html}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-
-# ============================================================
-# 2. AUTH — Login & Register
-# ============================================================
-def login_user(username, password):
+# ══════════════════════════════════════════════
+# DB HELPERS
+# ══════════════════════════════════════════════
+def login_user(username: str, password: str):
     res = supabase.table("users").select("*").eq("username", username).eq("password", password).execute()
     if res.data:
         user = res.data[0]
-        if user.get('status') == 'pending':
+        if user.get("status") == "pending":
             st.markdown("""
-                <div class="payment-card">
-                    <h4>⏳ Akun Belum Aktif</h4>
-                    <div class="payment-row">📱 <span>Kirim bukti bayar via <strong>WhatsApp</strong></span></div>
-                    <div class="payment-row">📞 <strong>0853-6637-4530</strong></div>
-                    <div class="payment-row">🏦 Rekening <strong>BRI: 1234-5678-9012-3456</strong> a.n. Growing Together</div>
-                    <div class="payment-row">💰 Biaya Aktivasi: <strong>Rp 25.000</strong></div>
+                <div class="pay-box">
+                    <h5>⏳ Akun Belum Aktif</h5>
+                    <div class="pay-row">📱 <span>Kirim bukti bayar via <strong>WhatsApp</strong></span></div>
+                    <div class="pay-row">📞 <strong>0853-6637-4530</strong></div>
+                    <div class="pay-row">🏦 BRI: <strong>1234-5678-9012-3456</strong> a.n. Growing Together</div>
+                    <div class="pay-row">💰 Biaya Aktivasi: <strong>Rp 25.000</strong></div>
                 </div>
             """, unsafe_allow_html=True)
             st.stop()
         return user
     return None
 
-def register_user(username, password):
+def register_user(username: str, password: str) -> bool:
     try:
-        supabase.table("users").insert({
-            "username": username,
-            "password": password,
-            "status": "pending"
-        }).execute()
+        supabase.table("users").insert({"username": username, "password": password, "status": "pending"}).execute()
         return True
-    except:
+    except Exception:
         return False
 
+def save_score(username: str, sesi: str, skor: int):
+    try:
+        supabase.table("scores").insert({"username": username, "sesi": sesi, "skor": skor}).execute()
+    except Exception:
+        pass
+
+def get_leaderboard(sesi: str = "Semua", limit: int = 5) -> list:
+    try:
+        if sesi == "Semua":
+            res = supabase.table("scores").select("username, sesi, skor").order("skor", desc=True).limit(limit).execute()
+        else:
+            res = supabase.table("scores").select("username, sesi, skor").eq("sesi", sesi).order("skor", desc=True).limit(limit).execute()
+        return res.data or []
+    except Exception:
+        return []
+
+
+# ══════════════════════════════════════════════
+# AUTH PAGE
+# ══════════════════════════════════════════════
 def show_auth():
-    # Minimal hero di halaman auth
     st.markdown("""
-        <div style="text-align:center; padding: 36px 20px 20px;">
-            <div style="font-size:3.5rem; margin-bottom:10px;">🛡️</div>
-            <div style="font-family:'Sora',sans-serif; font-size:1.9rem; font-weight:800; color:#1e3a8a;">Psychotech Polri</div>
-            <div style="font-size:0.9rem; color:#64748b; margin-top:6px;">Platform Simulasi CAT Psikotes Terpercaya</div>
+        <div class="auth-logo">
+            <span class="badge">[ CAT SYSTEM v2.0 ]</span>
+            <div class="name">PSYCHO<span>TECH</span></div>
+            <div class="sub">Platform Simulasi CAT Psikotes Polri</div>
         </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown('<div class="glass-card" style="padding:32px;">', unsafe_allow_html=True)
+    col_l, col_m, col_r = st.columns([1, 2.2, 1])
+    with col_m:
+        with st.container():
+            st.markdown('<div class="panel">', unsafe_allow_html=True)
+            tab1, tab2 = st.tabs(["🔑  LOGIN", "📝  DAFTAR"])
 
-        tab1, tab2 = st.tabs(["🔑  Masuk", "📝  Daftar"])
+            with tab1:
+                st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
+                with st.form("login_form"):
+                    u = st.text_input("Username", placeholder="username lo")
+                    p = st.text_input("Password", type="password", placeholder="••••••••")
+                    if st.form_submit_button("MASUK KE ARENA →", use_container_width=True):
+                        user = login_user(u, p)
+                        if user:
+                            st.session_state.logged_in = True
+                            st.session_state.username  = u
+                            st.session_state.page      = "home"
+                            st.rerun()
+                        else:
+                            st.error("❌ Kredensial salah.")
 
-        # ── TAB LOGIN ──
-        with tab1:
-            st.markdown('<div style="height:12px"></div>', unsafe_allow_html=True)
-            with st.form("login_form"):
-                u = st.text_input("Username", placeholder="Masukkan username lo")
-                p = st.text_input("Password", type="password", placeholder="••••••••")
-                if st.form_submit_button("Masuk ke Dashboard →", use_container_width=True):
-                    user = login_user(u, p)
-                    if user:
-                        st.session_state.logged_in = True
-                        st.session_state.username = u
-                        st.rerun()
-                    else:
-                        st.error("❌ Username atau Password salah, coba lagi.")
+            with tab2:
+                st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
+                with st.form("reg_form", clear_on_submit=True):
+                    nu = st.text_input("Username Baru", placeholder="casis_hebat_2025")
+                    np = st.text_input("Password", type="password", placeholder="Min 6 karakter")
+                    if st.form_submit_button("DAFTAR SEKARANG →", use_container_width=True):
+                        if not nu or not np:
+                            st.warning("⚠️ Isi semua field.")
+                        elif len(np) < 6:
+                            st.warning("⚠️ Password minimal 6 karakter.")
+                        elif register_user(nu, np):
+                            st.success(f"✅ Akun **{nu}** dibuat. Login untuk instruksi aktivasi.")
+                        else:
+                            st.error("❌ Username sudah dipakai.")
 
-        # ── TAB REGISTER ──
-        with tab2:
-            st.markdown('<div style="height:12px"></div>', unsafe_allow_html=True)
-            with st.form("reg_form", clear_on_submit=True):
-                new_u = st.text_input("Username Baru", placeholder="Contoh: casis_hebat_2025")
-                new_p = st.text_input("Password", type="password", placeholder="Minimal 6 karakter")
-                submit_reg = st.form_submit_button("Daftar Sekarang →", use_container_width=True)
+                st.markdown("""
+                    <div class="pay-box">
+                        <h5>💳 Cara Aktivasi</h5>
+                        <div class="pay-row">1. Daftar lalu <strong>Login</strong> dengan akun baru</div>
+                        <div class="pay-row">2. Transfer BRI: <strong>1234-5678-9012-3456</strong> — <strong>Rp 25.000</strong></div>
+                        <div class="pay-row">3. WA bukti ke: <strong>0853-6637-4530</strong></div>
+                        <div class="pay-row">✅ Aktivasi <strong>dalam 1×24 jam</strong></div>
+                    </div>
+                """, unsafe_allow_html=True)
 
-                if submit_reg:
-                    if not new_u or not new_p:
-                        st.warning("⚠️ Isi username dan password dulu bro!")
-                    elif len(new_p) < 6:
-                        st.warning("⚠️ Password minimal 6 karakter.")
-                    elif register_user(new_u, new_p):
-                        st.success(f"✅ Akun **{new_u}** berhasil dibuat!")
-                        st.info("Login lalu ikuti instruksi aktivasi yang muncul.")
-                    else:
-                        st.error("❌ Username sudah dipakai, coba nama lain.")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            # ── Instruksi Pembayaran ──
-            st.markdown("""
-                <div class="payment-card" style="margin-top:18px;">
-                    <h4>💳 Cara Aktivasi Akun</h4>
-                    <div class="payment-row">1️⃣  Daftar dan <strong>Login</strong> dengan akun baru lo</div>
-                    <div class="payment-row">2️⃣  Transfer ke <strong>BRI: 1234-5678-9012-3456</strong><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a.n. Growing Together — <strong>Rp 25.000</strong></div>
-                    <div class="payment-row">3️⃣  Kirim bukti transfer ke WA: <strong>0853-6637-4530</strong></div>
-                    <div class="payment-row">✅  Akun diaktifkan admin <strong>dalam 1×24 jam</strong></div>
-                </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # IG Credit
         st.markdown("""
-            <div class="ig-credit-box">
+            <div class="footer-credit">
                 🚀 <b>Project Development</b> &nbsp;|&nbsp;
                 <a href="https://www.instagram.com/growing_together369" target="_blank">@growing_together369</a>
             </div>
         """, unsafe_allow_html=True)
 
 
-# ============================================================
-# 3. HOME PAGE
-# ============================================================
+# ══════════════════════════════════════════════
+# HOME PAGE
+# ══════════════════════════════════════════════
 def show_home():
-    # ── Hero ──
-    st.markdown("""
-        <div class="hero-wrap">
-            <div class="hero-badge">🛡️ Platform Resmi Simulasi CAT Polri</div>
-            <h1 class="hero-title">Lolos Psikotes Polri<br>Bukan Sekadar Mimpi</h1>
-            <p class="hero-sub">Latihan soal autentik, timer real-time, dan analisis skor untuk memaksimalkan peluang lulus seleksi.</p>
-            <div class="stats-row">
-                <div class="stat-pill">
-                    <span class="stat-num">1.500+</span>
-                    <span class="stat-label">Casis Lulus</span>
-                </div>
-                <div class="stat-pill">
-                    <span class="stat-num">98%</span>
-                    <span class="stat-label">Akurasi Soal</span>
-                </div>
-                <div class="stat-pill">
-                    <span class="stat-num">3</span>
-                    <span class="stat-label">Sesi Ujian</span>
-                </div>
-                <div class="stat-pill">
-                    <span class="stat-num">24/7</span>
-                    <span class="stat-label">Akses Penuh</span>
-                </div>
+    # ── Command Banner ──
+    st.markdown(f"""
+        <div class="hero-command">
+            <div class="hero-rank">[ SISTEM AKTIF ]</div>
+            <h1 class="hero-title">ARENA<br><span>KOMPETISI</span><br>CAT POLRI</h1>
+            <p class="hero-sub">Simulasi psikotes paling dekat dengan kondisi ujian asli. Latih dirimu, kalahkan kompetitor.</p>
+            <div class="stat-row">
+                <div class="stat-chip"><span class="n">1.500+</span><span class="l">Casis Lulus</span></div>
+                <div class="stat-chip"><span class="n">4</span><span class="l">Sesi Ujian</span></div>
+                <div class="stat-chip"><span class="n">98%</span><span class="l">Akurasi Soal</span></div>
+                <div class="stat-chip"><span class="n">24/7</span><span class="l">Akses Penuh</span></div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # ── Nav Cards ──
-    c1, c2, c3 = st.columns(3)
-    navs = [
-        ("🧠", "Kecerdasan", "Logika, numerik & verbal berbasis pola soal asli Polri."),
-        ("🎯", "Kecermatan", "Latihan ketelitian dan kecepatan membaca simbol & karakter."),
-        ("🧬", "Kepribadian", "Profil psikologi berbasis instrumen standar seleksi Polri."),
-    ]
-    for col, (icon, title, desc) in zip([c1, c2, c3], navs):
-        with col:
+    col_main, col_lb = st.columns([3, 2], gap="large")
+
+    # ── LEFT: Arena Cards ──
+    with col_main:
+        st.markdown("""
+            <div class="sec-head">
+                <div class="sec-head-line"></div>
+                <div class="sec-head-text">Pilih Sesi Latihan</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        sesi_data = [
+            {
+                "key": "Pass Hand",
+                "icon": "⚡",
+                "title": "PASS HAND",
+                "desc": "Uji koordinasi mata-tangan. Klik target sebanyak mungkin dalam 30 detik. Tidak ada benar/salah — hanya kecepatan.",
+                "tags": ["APS", "30 Detik", "Ketangkasan"],
+                "accent": "#fb6b00",
+            },
+            {
+                "key": "Kecerdasan",
+                "icon": "🧠",
+                "title": "KECERDASAN",
+                "desc": "Logika, numerik, verbal & Wawasan Kebangsaan. AI-generated soal autentik. Benar +5, Salah 0.",
+                "tags": ["10 Soal", "+5 per Benar", "AI Soal"],
+                "accent": "#39d353",
+            },
+            {
+                "key": "Kecermatan",
+                "icon": "🎯",
+                "title": "KECERMATAN",
+                "desc": "Temukan karakter yang hilang dari kunci 5-karakter. Kecepatan dan stabilitas diukur (Skor Ketahanan).",
+                "tags": ["10 Soal", "Karakter Hilang", "Ketahanan"],
+                "accent": "#58a6ff",
+            },
+            {
+                "key": "Kepribadian",
+                "icon": "🧬",
+                "title": "KEPRIBADIAN",
+                "desc": "Profil psikologi berdasarkan respons situasional. Tidak ada jawaban salah — setiap pilihan punya bobot berbeda.",
+                "tags": ["10 Soal", "Skor 1–5", "Profiling"],
+                "accent": "#bc8cff",
+            },
+        ]
+
+        st.markdown('<div class="arena-grid">', unsafe_allow_html=True)
+        for s in sesi_data:
+            tags_html = "".join(f'<span class="meta-tag">{t}</span>' for t in s["tags"])
             st.markdown(f"""
-                <div class="nav-card-wrap">
-                    <span class="nav-icon">{icon}</span>
-                    <div class="nav-title">{title}</div>
-                    <div class="nav-desc">{desc}</div>
+                <div class="arena-card" style="--card-accent:{s['accent']};">
+                    <span class="ac-icon">{s['icon']}</span>
+                    <div class="ac-title">{s['title']}</div>
+                    <div class="ac-desc">{s['desc']}</div>
+                    <div class="ac-meta">{tags_html}</div>
+                </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Tombol mulai sesi — 2x2 grid via st.columns
+        r1c1, r1c2 = st.columns(2)
+        r2c1, r2c2 = st.columns(2)
+        btn_map = [
+            (r1c1, "Pass Hand",   "⚡ MULAI PASS HAND"),
+            (r1c2, "Kecerdasan",  "🧠 MULAI KECERDASAN"),
+            (r2c1, "Kecermatan",  "🎯 MULAI KECERMATAN"),
+            (r2c2, "Kepribadian", "🧬 MULAI KEPRIBADIAN"),
+        ]
+        for col, sesi_key, label in btn_map:
+            with col:
+                if st.button(label, key=f"start_{sesi_key}", use_container_width=True):
+                    _init_sesi(sesi_key)
+                    st.session_state.page = "simulasi"
+                    st.rerun()
+
+    # ── RIGHT: Leaderboard ──
+    with col_lb:
+        st.markdown("""
+            <div class="sec-head">
+                <div class="sec-head-line"></div>
+                <div class="sec-head-text">🏆 Leaderboard</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        filter_sesi = st.selectbox(
+            "Filter:",
+            ["Semua", "Pass Hand", "Kecerdasan", "Kecermatan", "Kepribadian"],
+            label_visibility="collapsed",
+            key="lb_filter"
+        )
+        rows = get_leaderboard(filter_sesi, limit=10)
+
+        medal_map = {1: ("🥇", "r1"), 2: ("🥈", "r2"), 3: ("🥉", "r3")}
+        rows_html = ""
+        for i, row in enumerate(rows, 1):
+            medal, cls = medal_map.get(i, ("", "rx"))
+            uname = row.get("username", "—")
+            skor  = row.get("skor", 0)
+            sesi  = row.get("sesi", "—")
+            rows_html += f"""
+            <tr>
+                <td><span class="lb-rank {cls}">{medal or f'#{i}'}</span></td>
+                <td style="font-weight:600;">{uname}</td>
+                <td><span class="lb-sesi">{sesi}</span></td>
+                <td><span class="lb-score">{skor}</span></td>
+            </tr>
+            """
+
+        if not rows_html:
+            rows_html = '<tr><td colspan="4" style="text-align:center; color:var(--text-dim); padding:28px 0;">Belum ada data</td></tr>'
+
+        st.markdown(f"""
+            <div class="panel" style="padding:20px;">
+                <table class="lb-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Username</th>
+                            <th>Sesi</th>
+                            <th>Skor</th>
+                        </tr>
+                    </thead>
+                    <tbody>{rows_html}</tbody>
+                </table>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Highlight skor user sendiri
+        my_scores = []
+        try:
+            res = supabase.table("scores")\
+                .select("sesi, skor")\
+                .eq("username", st.session_state.get("username", ""))\
+                .order("skor", desc=True)\
+                .limit(4)\
+                .execute()
+            my_scores = res.data or []
+        except Exception:
+            pass
+
+        if my_scores:
+            st.markdown("""
+                <div class="sec-head" style="margin-top:20px;">
+                    <div class="sec-head-line"></div>
+                    <div class="sec-head-text">Skor Terbaik Lo</div>
+                </div>
+            """, unsafe_allow_html=True)
+            my_rows = ""
+            for s in my_scores:
+                my_rows += f'<tr><td><span class="lb-sesi">{s["sesi"]}</span></td><td><span class="lb-score">{s["skor"]}</span></td></tr>'
+            st.markdown(f"""
+                <div class="panel" style="padding:16px 20px;">
+                    <table class="lb-table">
+                        <thead><tr><th>Sesi</th><th>Best</th></tr></thead>
+                        <tbody>{my_rows}</tbody>
+                    </table>
                 </div>
             """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
-
-    # ── News Section ──
-    st.markdown('<div class="section-title">📰 Berita & Update Terkini</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subtitle">Informasi terbaru seputar pendaftaran dan seleksi Polri.</div>', unsafe_allow_html=True)
-
-    n1, n2, n3 = st.columns(3)
-    news_data = [
-        {
-            "tag": "🔴 Penting",  "tag_class": "tag-red",
-            "title": "Jadwal Pendaftaran Bintara Polri 2025 Resmi Dibuka",
-            "body": "Mabes Polri mengumumkan pembukaan penerimaan Bintara Polri gelombang pertama. Pastikan berkas administrasi lengkap sebelum tanggal penutupan.",
-            "date": "📅 21 April 2025",
-        },
-        {
-            "tag": "🔵 Tips",     "tag_class": "tag-blue",
-            "title": "5 Strategi Jitu Lolos Psikotes Polri Versi Instruktur",
-            "body": "Kecermatan dan kecepatan berpikir adalah kunci. Latihan rutin minimal 30 menit sehari terbukti meningkatkan skor rata-rata 40% dalam 2 minggu.",
-            "date": "📅 18 April 2025",
-        },
-        {
-            "tag": "🟢 Jadwal",   "tag_class": "tag-green",
-            "title": "Jadwal Psikotes Polda Metro Jaya & Polda Jabar 2025",
-            "body": "Polda Metro Jaya: 28 April 2025. Polda Jabar: 2 Mei 2025. Polda Jateng: 5 Mei 2025. Siapkan diri lo dari sekarang!",
-            "date": "📅 15 April 2025",
-        },
-    ]
-    for col, n in zip([n1, n2, n3], news_data):
-        with col:
-            st.markdown(f"""
-                <div class="news-card">
-                    <span class="news-tag {n['tag_class']}">{n['tag']}</span>
-                    <div class="news-title">{n['title']}</div>
-                    <div class="news-body">{n['body']}</div>
-                    <span class="news-date">{n['date']}</span>
-                </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("<div style='height:36px'></div>", unsafe_allow_html=True)
-
-    # ── Testimonial Section ──
-    st.markdown('<div class="section-title">💬 Kata Mereka yang Sudah Lulus</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subtitle">Ribuan casis telah membuktikannya. Giliran lo! 🔥</div>', unsafe_allow_html=True)
-    render_testimonial_slider()
-
-    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
-
-    # IG Credit
     st.markdown("""
-        <div class="ig-credit-box">
+        <div class="footer-credit">
             🚀 <b>Project Development</b> &nbsp;|&nbsp;
             <a href="https://www.instagram.com/growing_together369" target="_blank">@growing_together369</a>
         </div>
     """, unsafe_allow_html=True)
 
 
-# ============================================================
-# 4. SIMULASI — Polished Timer + Kecermatan Layout
-# ============================================================
-def show_simulation():
-    st.markdown("""
-        <div style="font-family:'Sora',sans-serif; font-size:1.3rem; font-weight:700;
-             color:#1e3a8a; margin-bottom:16px;">
-            🎯 Mulai Simulasi CAT
-        </div>
-    """, unsafe_allow_html=True)
+# ══════════════════════════════════════════════
+# SIMULASI HELPERS
+# ══════════════════════════════════════════════
+SOAL_TOTAL = 10
+TIMER_DETIK = 30
 
-    sesi = st.selectbox(
-        "Pilih Sesi Ujian:",
-        ["Kecerdasan", "Kecermatan", "Kepribadian"],
-        label_visibility="collapsed"
-    )
+SESI_CONFIG = {
+    "Pass Hand":   {"icon": "⚡", "label": "PASS HAND",   "timer": 30},
+    "Kecerdasan":  {"icon": "🧠", "label": "KECERDASAN",  "timer": 30},
+    "Kecermatan":  {"icon": "🎯", "label": "KECERMATAN",  "timer": 25},
+    "Kepribadian": {"icon": "🧬", "label": "KEPRIBADIAN", "timer": 45},
+}
 
-    # ── Session State Init ──
-    if 'step' not in st.session_state or st.session_state.get('current_sesi') != sesi:
-        st.session_state.step       = 1
-        st.session_state.skor       = 0
-        st.session_state.current_sesi = sesi
-        st.session_state.end_time   = time.time() + 30
-        st.session_state.soal_aktif = (
-            generate_kecermatan() if sesi == "Kecermatan" else generate_soal_ai(sesi)
+def _next_soal(sesi: str):
+    if sesi == "Kecerdasan":
+        return generate_soal_kecerdasan()
+    elif sesi == "Kecermatan":
+        return generate_kecermatan()
+    elif sesi == "Kepribadian":
+        return generate_soal_kepribadian()
+    else:  # Pass Hand — config statis
+        return generate_pass_hand()
+
+def _init_sesi(sesi: str):
+    cfg = SESI_CONFIG[sesi]
+    st.session_state.sim_sesi      = sesi
+    st.session_state.sim_step      = 1
+    st.session_state.sim_skor      = 0
+    st.session_state.sim_done      = False
+    st.session_state.sim_end_time  = time.time() + cfg["timer"]
+    st.session_state.sim_soal      = _next_soal(sesi)
+    st.session_state.sim_waktu_kecermatan = []  # track ketahanan
+    # Pass Hand state
+    st.session_state.ph_klik       = 0
+    st.session_state.ph_start      = time.time()
+    st.session_state.ph_done       = False
+
+
+def _advance_soal(sesi: str, skor_tambah: int = 0, waktu_jawab: float = 0.0):
+    """Catat skor, maju ke soal berikutnya atau selesai."""
+    st.session_state.sim_skor += skor_tambah
+    if sesi == "Kecermatan" and waktu_jawab > 0:
+        st.session_state.sim_waktu_kecermatan.append(waktu_jawab)
+
+    if st.session_state.sim_step >= SOAL_TOTAL:
+        st.session_state.sim_done = True
+        save_score(
+            st.session_state.get("username", "guest"),
+            sesi,
+            st.session_state.sim_skor,
         )
-
-    # ── Timer Logic ──
-    remaining = int(st.session_state.end_time - time.time())
-    if remaining <= 0:
-        st.warning("⏰ Waktu habis! Lanjut ke soal berikutnya.")
-        time.sleep(0.8)
-        st.session_state.step     += 1
-        st.session_state.end_time  = time.time() + 30
-        st.session_state.soal_aktif = (
-            generate_kecermatan() if sesi == "Kecermatan" else generate_soal_ai(sesi)
-        )
-        st.rerun()
-
-    # ── Sim Header w/ Timer ──
-    timer_class = "timer-badge urgent" if remaining <= 10 else "timer-badge"
-    icon_map    = {"Kecerdasan": "🧠", "Kecermatan": "🎯", "Kepribadian": "🧬"}
-    st.markdown(f"""
-        <div class="sim-header">
-            <div>
-                <div class="sim-title">{icon_map.get(sesi,'📋')} Sesi {sesi}</div>
-                <div style="font-size:0.78rem; opacity:0.75; margin-top:3px;">
-                    Soal {st.session_state.step} dari 10
-                </div>
-            </div>
-            <div class="{timer_class}">
-                ⏱ {remaining} detik
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # ── Progress Bar ──
-    progress = (st.session_state.step - 1) / 10
-    st.progress(progress)
-
-    # ── Soal Rendering ──
-    if st.session_state.step <= 10:
-        soal = st.session_state.soal_aktif
-
-        if sesi == "Kecermatan":
-            # Kunci Karakter Grid
-            st.markdown("**📋 Tabel Kunci Karakter:**")
-            kunci_items = "".join(
-                f'<div class="kunci-item">{char}</div>' for char in soal['kunci']
-            )
-            st.markdown(f'<div class="kunci-grid">{kunci_items}</div>', unsafe_allow_html=True)
-
-            st.markdown(f"""
-                <div class="question-box">
-                    <div class="question-label">Soal {st.session_state.step}</div>
-                    <div class="question-text">
-                        Karakter apa yang <b>hilang</b> dari:<br>
-                        <span style="font-family:monospace; font-size:1.1rem; color:#1d4ed8; background:#eff6ff;
-                               padding:6px 12px; border-radius:6px; display:inline-block; margin-top:8px;">
-                            {soal['pertanyaan']}
-                        </span>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-                <div class="question-box">
-                    <div class="question-label">Soal {st.session_state.step} — {sesi}</div>
-                    <div class="question-text">{soal['pertanyaan']}</div>
-                </div>
-            """, unsafe_allow_html=True)
-
-        with st.form(key=f"form_soal_{st.session_state.step}_{sesi}"):
-            pilihan = st.radio("Pilih jawaban:", soal['opsi'], label_visibility="collapsed")
-            submit  = st.form_submit_button("Konfirmasi Jawaban →", use_container_width=True)
-
-            if submit:
-                if sesi == "Kepribadian":
-                    idx = soal['opsi'].index(pilihan)
-                    st.session_state.skor += soal['skor'][idx]
-                elif pilihan == soal['jawaban']:
-                    st.session_state.skor += 10
-
-                st.session_state.step     += 1
-                st.session_state.end_time  = time.time() + 30
-                st.session_state.soal_aktif = (
-                    generate_kecermatan() if sesi == "Kecermatan" else generate_soal_ai(sesi)
-                )
-                st.rerun()
-
     else:
-        # ── Score Result ──
-        skor   = st.session_state.skor
-        max_s  = 100
-        pct    = min(int(skor / max_s * 100), 100)
+        st.session_state.sim_step     += 1
+        cfg = SESI_CONFIG[sesi]
+        st.session_state.sim_end_time  = time.time() + cfg["timer"]
+        st.session_state.sim_soal      = _next_soal(sesi)
 
-        if skor >= 80:
-            verdict, v_color = "🏆 Lulus — Performa Excellent!", "#dcfce7"
-        elif skor >= 60:
-            verdict, v_color = "✅ Cukup Baik — Perlu Sedikit Peningkatan", "#fef9c3"
-        else:
-            verdict, v_color = "📈 Perlu Latihan Lebih Intensif", "#fee2e2"
 
-        st.markdown(f"""
-            <div class="score-card">
-                <div class="score-label">SKOR AKHIR — SESI {sesi.upper()}</div>
-                <div class="score-num">{skor}</div>
-                <div style="background:rgba(255,255,255,0.15); border-radius:999px;
-                     height:8px; margin: 12px auto; max-width:280px; overflow:hidden;">
-                    <div style="background:white; height:100%; width:{pct}%;
-                         border-radius:999px; transition:width 0.5s ease;"></div>
+# ══════════════════════════════════════════════
+# SIMULASI — MAIN RENDERER
+# ══════════════════════════════════════════════
+def show_simulation():
+    sesi = st.session_state.get("sim_sesi", "Kecerdasan")
+    cfg  = SESI_CONFIG[sesi]
+
+    # ── Done Screen ──
+    if st.session_state.get("sim_done", False):
+        _show_result(sesi)
+        return
+
+    soal  = st.session_state.sim_soal
+    step  = st.session_state.sim_step
+
+    # ── Sim Header ──
+    st.markdown(f"""
+        <div class="sim-hdr">
+            <div class="sim-hdr-left">
+                <div class="sesi-label">[ SESI AKTIF ]</div>
+                <div class="sesi-title">{cfg['icon']} {cfg['label']}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                <div style="font-family:var(--mono); font-size:0.75rem; color:var(--text-sec);">
+                    SOAL {step}/{SOAL_TOTAL if sesi != 'Pass Hand' else '—'}
                 </div>
-                <div style="font-size:0.9rem; margin-top:4px; opacity:0.85;">{verdict}</div>
+                <div id="timer-display" class="timer-box">--</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # ── Progress ──
+    if sesi != "Pass Hand":
+        pct = (step - 1) / SOAL_TOTAL * 100
+        st.markdown(f"""
+            <div class="prog-wrap">
+                <div class="prog-fill" style="width:{pct}%;"></div>
             </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
-        if st.button("🔄 Ulangi Sesi Ini", use_container_width=True):
-            del st.session_state.step
+    # ── Timer live update via st.empty ──
+    timer_slot = st.empty()
+
+    # ── Sesi-specific rendering ──
+    if sesi == "Pass Hand":
+        _render_pass_hand(timer_slot)
+    elif sesi == "Kecerdasan":
+        _render_kecerdasan(soal, step, timer_slot)
+    elif sesi == "Kecermatan":
+        _render_kecermatan(soal, step, timer_slot)
+    elif sesi == "Kepribadian":
+        _render_kepribadian(soal, step, timer_slot)
+
+    # ── Back button ──
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    if st.button("← Kembali ke Home", key="back_home"):
+        st.session_state.page = "home"
+        st.rerun()
+
+
+def _timer_html(remaining: int) -> str:
+    if remaining <= 5:
+        cls = "crit"
+    elif remaining <= 10:
+        cls = "warn"
+    else:
+        cls = ""
+    mins, secs = divmod(max(remaining, 0), 60)
+    display = f"{mins:02d}:{secs:02d}"
+    return f'<div class="timer-box {cls}" style="text-align:center;">{display}</div>'
+
+
+# ── PASS HAND ──
+def _render_pass_hand(timer_slot):
+    if st.session_state.get("ph_done", False):
+        elapsed = time.time() - st.session_state.ph_start
+        result  = hitung_aps(st.session_state.ph_klik, elapsed)
+        save_score(st.session_state.get("username","guest"), "Pass Hand", int(result["aps"] * 100))
+        st.session_state.sim_done = True
+        st.rerun()
+        return
+
+    dur   = SESI_CONFIG["Pass Hand"]["timer"]
+    start = st.session_state.ph_start
+    elapsed  = time.time() - start
+    remaining = max(0, int(dur - elapsed))
+
+    timer_slot.markdown(_timer_html(remaining), unsafe_allow_html=True)
+
+    if remaining <= 0:
+        st.session_state.ph_done = True
+        st.rerun()
+        return
+
+    kliks = st.session_state.ph_klik
+    pos   = st.session_state.get("ph_pos", {"x": 50, "y": 50})
+
+    col_ph, col_info = st.columns([3, 1])
+    with col_ph:
+        st.markdown(f"""
+            <div class="q-box" style="text-align:center; padding:36px 24px;">
+                <div class="q-num">KLIK TARGET SECEPAT MUNGKIN</div>
+                <div class="ph-counter">{kliks}</div>
+                <div class="ph-label">KLIK VALID</div>
+            </div>
+        """, unsafe_allow_html=True)
+        # Target button — position pseudo-random via re-render
+        st.markdown(f"""
+            <style>
+            .target-btn-wrap {{ 
+                display:flex; 
+                justify-content:center; 
+                margin: 16px 0;
+                padding: {pos['y']}px 0 0 {pos['x']}px;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+
+        if st.button("🎯", key=f"ph_target_{kliks}", use_container_width=False):
+            st.session_state.ph_klik += 1
+            new_pos = posisi_target_acak(400, 100, 64)
+            st.session_state.ph_pos  = new_pos
+            st.rerun()
+
+    with col_info:
+        aps_live = round(kliks / max(elapsed, 0.1), 2)
+        st.markdown(f"""
+            <div class="panel-elevated" style="text-align:center;">
+                <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text-sec);letter-spacing:2px;text-transform:uppercase;">APS Live</div>
+                <div style="font-family:var(--display);font-size:2.5rem;font-weight:900;color:var(--accent);line-height:1.1;margin-top:6px;">{aps_live}</div>
+                <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);margin-top:4px;">AKSI/DETIK</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # Refresh timer setiap detik
+    time.sleep(0.9)
+    st.rerun()
+
+
+# ── KECERDASAN ──
+def _render_kecerdasan(soal: dict, step: int, timer_slot):
+    remaining = int(st.session_state.sim_end_time - time.time())
+    timer_slot.markdown(_timer_html(remaining), unsafe_allow_html=True)
+
+    # Auto-submit jika waktu habis
+    if remaining <= 0:
+        _advance_soal("Kecerdasan", skor_tambah=0)
+        st.rerun()
+        return
+
+    st.markdown(f"""
+        <div class="q-box">
+            <div class="q-num">SOAL {step} &nbsp;/&nbsp; {soal.get('kategori','Kecerdasan')}</div>
+            <div class="q-text">{soal.get('pertanyaan','—')}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    with st.form(key=f"form_kec_{step}"):
+        pilihan = st.radio("Pilih jawaban:", soal.get("opsi", []), label_visibility="collapsed")
+        if st.form_submit_button("KONFIRMASI →", use_container_width=True):
+            huruf = pilihan.split(".")[0].strip()
+            skor  = nilai_jawaban_kecerdasan(huruf, soal.get("jawaban","A"))
+            _advance_soal("Kecerdasan", skor_tambah=skor)
+            st.rerun()
+
+    # Refresh timer
+    time.sleep(1)
+    st.rerun()
+
+
+# ── KECERMATAN ──
+def _render_kecermatan(soal: dict, step: int, timer_slot):
+    remaining = int(st.session_state.sim_end_time - time.time())
+    timer_slot.markdown(_timer_html(remaining), unsafe_allow_html=True)
+
+    if remaining <= 0:
+        # Auto-submit salah, catat waktu maksimal
+        _advance_soal("Kecermatan", skor_tambah=0, waktu_jawab=float(SESI_CONFIG["Kecermatan"]["timer"]))
+        st.rerun()
+        return
+
+    kunci_html = "".join(f'<div class="kunci-char">{c}</div>' for c in soal.get("kunci", []))
+    st.markdown(f"""
+        <div class="q-box">
+            <div class="q-num">KUNCI REFERENSI — SOAL {step}</div>
+            <div style="margin-bottom:14px;">
+                <div class="kunci-grid">{kunci_html}</div>
+            </div>
+            <div class="q-text">Karakter apa yang <b style="color:var(--red-alert);">HILANG</b> dari tampilan berikut?</div>
+            <div class="tampilan-box">{soal.get('tampilan','')}&nbsp;<span class="missing">?</span></div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    with st.form(key=f"form_cer_{step}"):
+        pilihan = st.radio("Pilih karakter:", soal.get("opsi", []), label_visibility="collapsed", horizontal=True)
+        if st.form_submit_button("KONFIRMASI →", use_container_width=True):
+            waktu = catat_waktu_jawab(soal)
+            skor  = nilai_jawaban_kecermatan(str(pilihan).strip(), soal.get("jawaban",""))
+            _advance_soal("Kecermatan", skor_tambah=skor, waktu_jawab=waktu)
+            st.rerun()
+
+    time.sleep(1)
+    st.rerun()
+
+
+# ── KEPRIBADIAN ──
+def _render_kepribadian(soal: dict, step: int, timer_slot):
+    remaining = int(st.session_state.sim_end_time - time.time())
+    timer_slot.markdown(_timer_html(remaining), unsafe_allow_html=True)
+
+    if remaining <= 0:
+        _advance_soal("Kepribadian", skor_tambah=1)
+        st.rerun()
+        return
+
+    st.markdown(f"""
+        <div class="q-box">
+            <div class="q-num">SITUASI {step} &nbsp;/&nbsp; KEPRIBADIAN</div>
+            <div class="q-text">{soal.get('pertanyaan','—')}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    with st.form(key=f"form_kep_{step}"):
+        pilihan = st.radio("Pilih respons:", soal.get("opsi", []), label_visibility="collapsed")
+        if st.form_submit_button("KONFIRMASI →", use_container_width=True):
+            huruf = pilihan.split(".")[0].strip()
+            skor  = nilai_jawaban_kepribadian(huruf, soal.get("skor", {}))
+            _advance_soal("Kepribadian", skor_tambah=skor)
+            st.rerun()
+
+    time.sleep(1)
+    st.rerun()
+
+
+# ── RESULT SCREEN ──
+def _show_result(sesi: str):
+    skor = st.session_state.sim_skor
+
+    # Kalkulasi konteks sesi
+    if sesi == "Pass Hand":
+        elapsed = time.time() - st.session_state.get("ph_start", time.time())
+        result  = hitung_aps(st.session_state.get("ph_klik", 0), elapsed)
+        skor_display = result["aps"]
+        unit = "APS"
+        max_ref = 5.0
+        verdict = result["kategori"]
+        extra_html = f"""
+            <div style="font-family:var(--mono);font-size:0.75rem;color:var(--text-sec);margin-top:16px;">
+                {result['jumlah_klik']} klik &nbsp;/&nbsp; {result['durasi_detik']}s &nbsp;/&nbsp; {result['deskripsi']}
+            </div>
+        """
+    elif sesi == "Kecerdasan":
+        skor_display = skor
+        unit = "PTS"
+        max_ref = SOAL_TOTAL * 5
+        if skor >= max_ref * 0.8:   verdict = "🏆 EXCELLENT — Performa sangat tinggi"
+        elif skor >= max_ref * 0.6: verdict = "✅ BAIK — Di atas rata-rata"
+        else:                        verdict = "📈 PERLU LATIHAN LEBIH"
+        extra_html = ""
+    elif sesi == "Kecermatan":
+        skor_display = skor
+        unit = "BENAR"
+        max_ref = SOAL_TOTAL
+        ketahanan_data = hitung_ketahanan(st.session_state.get("sim_waktu_kecermatan", []))
+        if skor >= max_ref * 0.8:   verdict = "🏆 CERMAT & CEPAT"
+        elif skor >= max_ref * 0.6: verdict = "✅ CUKUP BAIK"
+        else:                        verdict = "📈 TINGKATKAN KETELITIAN"
+        extra_html = f"""
+            <div style="margin-top:16px; background:var(--bg-elevated); border-radius:6px; padding:12px 16px; display:inline-block;">
+                <span style="font-family:var(--mono);font-size:0.7rem;color:var(--accent);">KETAHANAN</span>
+                <div style="font-family:var(--display);font-size:2rem;font-weight:900;color:var(--text-pri);">
+                    {ketahanan_data['skor_ketahanan']}<span style="font-size:1rem;color:var(--text-sec);">/100</span>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-sec);">{ketahanan_data['kategori']}</div>
+            </div>
+        """
+    else:  # Kepribadian
+        skor_display = skor
+        unit = "PTS"
+        max_ref = SOAL_TOTAL * 5
+        rata = round(skor / SOAL_TOTAL, 2)
+        if rata >= 4:   verdict = "🏆 PROFIL SANGAT SESUAI"
+        elif rata >= 3: verdict = "✅ PROFIL BAIK"
+        else:            verdict = "📊 PERLU EVALUASI DIRI"
+        extra_html = f'<div style="font-family:var(--mono);font-size:0.75rem;color:var(--text-sec);margin-top:10px;">Rata-rata per soal: {rata}</div>'
+
+    pct = min(int(float(skor_display) / max_ref * 100), 100)
+
+    st.markdown(f"""
+        <div class="result-box">
+            <div class="result-label">[ SESI {sesi.upper()} — SELESAI ]</div>
+            <div class="result-score">{skor_display}</div>
+            <div style="font-family:var(--mono);font-size:0.75rem;color:var(--text-sec);">{unit}</div>
+            <div class="result-bar-wrap">
+                <div class="result-bar-fill" style="width:{pct}%;"></div>
+            </div>
+            <div class="result-verdict">{verdict}</div>
+            {extra_html}
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 ULANGI SESI INI", use_container_width=True):
+            _init_sesi(sesi)
+            st.rerun()
+    with col2:
+        if st.button("🏠 KEMBALI KE HOME", use_container_width=True):
+            st.session_state.page = "home"
             st.rerun()
 
 
-# ============================================================
+# ══════════════════════════════════════════════
 # MAIN ROUTING
-# ============================================================
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
+# ══════════════════════════════════════════════
+def main():
+    # Init state
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+    if "page" not in st.session_state:
+        st.session_state.page = "home"
 
-if not st.session_state.logged_in:
-    show_auth()
-else:
+    if not st.session_state.logged_in:
+        show_auth()
+        return
+
     # ── Sidebar ──
     with st.sidebar:
         st.markdown("""
-            <div style="text-align:center; padding: 18px 0 12px;">
-                <div style="font-size:2.2rem;">🛡️</div>
-                <div style="font-family:'Sora',sans-serif; font-size:1rem; font-weight:700;
-                     color:#1e3a8a; margin-top:4px;">Psychotech Polri</div>
-            </div>
-        """, unsafe_allow_html=True)
-        st.divider()
-
-        menu = st.radio(
-            "Navigasi",
-            ["🏠  Home", "🎯  Mulai Simulasi", "📊  Dashboard Admin"],
-            label_visibility="collapsed"
-        )
-        st.divider()
-        st.markdown(f"👤 Login sebagai: **{st.session_state.get('username','—')}**")
-        st.markdown("""
-            <div style="margin-top:10px; font-size:0.78rem; color:#94a3b8; text-align:center;">
-                🚀 Project Development<br>
-                <a href="https://www.instagram.com/growing_together369" target="_blank"
-                   style="color:#E1306C; font-weight:700; text-decoration:none;">
-                   @growing_together369
-                </a>
-            </div>
-        """, unsafe_allow_html=True)
-        st.divider()
-        if st.button("🚪 Keluar (Logout)", use_container_width=True):
-            st.session_state.logged_in = False
-            st.rerun()
-
-    # ── Route ──
-    page = menu.split("  ", 1)[-1]
-    if page == "Home":
-        show_home()
-    elif page == "Mulai Simulasi":
-        show_simulation()
-    elif page == "Dashboard Admin":
-        st.markdown("""
-            <div class="glass-card" style="text-align:center; padding:48px 32px;">
-                <div style="font-size:3rem; margin-bottom:12px;">🔧</div>
-                <div style="font-family:'Sora',sans-serif; font-size:1.3rem; font-weight:700;
-                     color:#1e3a8a;">Dashboard Admin</div>
-                <div style="color:#64748b; font-size:0.9rem; margin-top:8px;">
-                    Halaman ini sedang dalam pengembangan. Segera hadir!
+            <div style="text-align:center; padding:20px 0 14px;">
+                <div style="font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+                     color:#fb6b00; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px;">
+                    [ SISTEM AKTIF ]
+                </div>
+                <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.5rem;
+                     font-weight:900; color:#e6edf3; letter-spacing:-0.5px;">
+                    PSYCHOTECH
                 </div>
             </div>
         """, unsafe_allow_html=True)
+        st.divider()
+
+        if st.button("🏠  HOME", use_container_width=True, key="nav_home"):
+            st.session_state.page = "home"
+            st.rerun()
+
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-family:JetBrains Mono;font-size:0.6rem;color:#484f58;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;'>MULAI SESI</div>", unsafe_allow_html=True)
+        for sesi_key in ["Pass Hand", "Kecerdasan", "Kecermatan", "Kepribadian"]:
+            cfg = SESI_CONFIG[sesi_key]
+            if st.button(f"{cfg['icon']}  {cfg['label']}", use_container_width=True, key=f"nav_{sesi_key}"):
+                _init_sesi(sesi_key)
+                st.session_state.page = "simulasi"
+                st.rerun()
+
+        st.divider()
+        st.markdown(f"<div style='font-size:0.78rem;color:#7d8590;'>👤 <b style='color:#e6edf3;'>{st.session_state.get('username','—')}</b></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        if st.button("🚪 LOGOUT", use_container_width=True, key="nav_logout"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+        st.markdown("""
+            <div style="text-align:center; margin-top:16px; font-size:0.72rem; color:#484f58;">
+                🚀 <a href="https://www.instagram.com/growing_together369" target="_blank"
+                   style="color:#fb6b00;text-decoration:none;font-weight:700;">@growing_together369</a>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # ── Page Router ──
+    page = st.session_state.page
+    if page == "home":
+        show_home()
+    elif page == "simulasi":
+        show_simulation()
+
+
+if __name__ == "__main__":
+    main()
