@@ -5,7 +5,7 @@ from database import supabase
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="Psychotech Polri | Simulasi CAT Profesional",
+    page_title="Tes Psikologi Polri | Simulasi CAT Profesional",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="collapsed"
