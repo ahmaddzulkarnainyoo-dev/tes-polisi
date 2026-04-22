@@ -42,7 +42,7 @@ def login_user(username, password):
         user = res.data[0]
         if user.get('status') == 'pending':
             st.warning("⚠️ Akun lo belum aktif, bro. Selesaikan pembayaran dulu.")
-            st.info("Kirim bukti bayar ke WA: 0812-xxxx-xxxx")
+            st.info("Kirim bukti bayar ke WA: 0853-6637-4530")
             st.stop()
         return user
     return None
