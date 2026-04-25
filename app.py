@@ -1,28 +1,30 @@
 """
-app.py — Psychotech Polri | Arena CAT v3.1
-Changelog:
-- Kepribadian: Likert 5 skala statis (A-E), skor berdasar arah pernyataan
-- Kecermatan: Hilangkan tanda tanya dari tampilan soal
+app.py — Psychotech Polri | Arena CAT v4.0 (Marathon Edition)
+Changelog v4.0:
+- Alur Maraton: Pass Hand → Kecerdasan → Kepribadian → Kecermatan (satu alur kontinu)
+- Nilai hanya muncul di akhir semua sesi, dengan status MS/TMS (passing grade 61)
+- Halaman Evaluasi: Review jawaban salah per sesi setelah nilai akhir keluar
+- Skor 0-100 per sesi: Kecerdasan & Kecermatan (Benar/Total*100), Kepribadian (Likert→100)
+- Pass Hand: skor ideal-match ke 0-100
 - Anti-copas: CSS user-select disabled + watermark username transparan
-- Leaderboard: display_leaderboard() dengan filter dan styling kompetitif
-- Navigasi: Sebelumnya/Selanjutnya di semua sesi kecuali Kecermatan (auto-submit)
+- Leaderboard Top 5 di Home (Supabase)
+- Navigasi Sebelumnya/Selanjutnya (kecuali Kecermatan auto-submit)
 """
 
 import streamlit as st
 import time
 from engine import (
-    generate_soal_kecerdasan,
-    generate_soal_kepribadian,
-    generate_kecermatan,
-    generate_pass_hand,
-    hitung_aps,
-    hitung_ketahanan,
+    generate_soal,
+    skor_sesi_pass_hand,
+    skor_sesi_kecerdasan,
+    skor_sesi_kepribadian,
+    skor_sesi_kecermatan,
+    rekap_maraton,
     catat_waktu_jawab,
-    nilai_jawaban_kecerdasan,
-    nilai_jawaban_kepribadian,
-    nilai_jawaban_kecermatan,
-    posisi_target_acak,
     LIKERT_OPSI,
+    URUTAN_MARATON,
+    SOAL_PER_SESI,
+    PASSING_GRADE,
 )
 from database import supabase
 
@@ -54,22 +56,17 @@ st.markdown("""
     --green-ok:     #39d353;
     --red-alert:    #f85149;
     --gold:         #e3b341;
+    --blue-info:    #58a6ff;
+    --purple-kep:   #bc8cff;
     --text-pri:     #e6edf3;
     --text-sec:     #7d8590;
     --text-dim:     #484f58;
     --mono:         'JetBrains Mono', monospace;
     --display:      'Barlow Condensed', sans-serif;
     --body:         'Barlow', sans-serif;
-    --r-sm:         6px;
-    --r-md:         10px;
-    --r-lg:         16px;
+    --r-sm: 6px; --r-md: 10px; --r-lg: 16px;
 }
-
-html, body, [class*="css"] {
-    font-family: var(--body) !important;
-    background-color: var(--bg-void) !important;
-    color: var(--text-pri) !important;
-}
+html, body, [class*="css"] { font-family: var(--body) !important; background-color: var(--bg-void) !important; color: var(--text-pri) !important; }
 .stApp {
     background:
         radial-gradient(ellipse at 20% 0%, rgba(251,107,0,0.07) 0%, transparent 50%),
@@ -78,20 +75,15 @@ html, body, [class*="css"] {
     min-height: 100vh;
 }
 #MainMenu, footer, header { visibility: hidden; }
-.block-container {
-    padding-top: 1.2rem !important;
-    padding-bottom: 3rem !important;
-    max-width: 1200px !important;
-}
+.block-container { padding-top: 1.2rem !important; padding-bottom: 3rem !important; max-width: 1200px !important; }
 .stApp::after {
     content: '';
     position: fixed; inset: 0;
     background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
-    pointer-events: none;
-    z-index: 9999;
+    pointer-events: none; z-index: 9999;
 }
 
-/* ── Anti-Copas: disable text selection di area simulasi ── */
+/* ── Anti-Copas ── */
 .no-select, .q-box, .pernyataan-box, .kunci-grid, .tampilan-box, .q-text {
     -webkit-user-select: none !important;
     -moz-user-select: none !important;
@@ -99,214 +91,212 @@ html, body, [class*="css"] {
     user-select: none !important;
 }
 
-/* ── Watermark username transparan ── */
+/* ── Watermark ── */
 .sim-watermark {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    z-index: 1000;
-    overflow: hidden;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 1000; overflow: hidden;
 }
 .sim-watermark-text {
-    font-family: var(--display);
-    font-size: 4.5rem;
-    font-weight: 900;
-    color: rgba(251, 107, 0, 0.045);
-    text-transform: uppercase;
-    letter-spacing: 6px;
-    transform: rotate(-30deg);
-    white-space: nowrap;
-    text-shadow: none;
-    line-height: 1.2;
-    text-align: center;
+    font-family: var(--display); font-size: 4.5rem; font-weight: 900;
+    color: rgba(251,107,0,0.045); text-transform: uppercase;
+    letter-spacing: 6px; transform: rotate(-30deg); white-space: nowrap;
+    text-align: center; line-height: 1.2;
 }
 .sim-watermark-text span {
-    display: block;
-    font-size: 2rem;
-    letter-spacing: 10px;
-    color: rgba(255, 255, 255, 0.025);
-    margin-top: 6px;
+    display: block; font-size: 2rem; letter-spacing: 10px;
+    color: rgba(255,255,255,0.025); margin-top: 6px;
 }
 
 /* ── Panels ── */
 .panel { background: var(--bg-panel); border: 1px solid var(--border-dim); border-radius: var(--r-lg); padding: 28px; margin-bottom: 20px; }
-.panel-elevated { background: var(--bg-surface); border: 1px solid var(--border-dim); border-radius: var(--r-md); padding: 20px; }
+.panel-sm { background: var(--bg-surface); border: 1px solid var(--border-dim); border-radius: var(--r-md); padding: 18px; }
 
 /* ── Hero ── */
 .hero-command {
-    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1a1f2e 100%);
-    border: 1px solid var(--border-dim);
-    border-top: 2px solid var(--accent);
-    border-radius: var(--r-lg);
-    padding: 40px 32px 36px;
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 24px;
+    background: linear-gradient(135deg,#0d1117 0%,#161b22 50%,#1a1f2e 100%);
+    border: 1px solid var(--border-dim); border-top: 2px solid var(--accent);
+    border-radius: var(--r-lg); padding: 40px 32px 36px;
+    position: relative; overflow: hidden; margin-bottom: 24px;
 }
 .hero-command::before {
-    content: 'PSYCHOTECH';
-    position: absolute; right: -20px; top: -10px;
+    content: 'PSYCHOTECH'; position: absolute; right: -20px; top: -10px;
     font-family: var(--display); font-size: 9rem; font-weight: 900;
-    color: rgba(255,255,255,0.02); line-height: 1; pointer-events: none; letter-spacing: -4px;
+    color: rgba(255,255,255,0.02); pointer-events: none; letter-spacing: -4px;
 }
-.hero-rank { display: inline-flex; align-items: center; gap: 8px; background: var(--accent-dim); border: 1px solid var(--border-glow); border-radius: 4px; padding: 4px 12px; font-family: var(--mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px; }
-.hero-title { font-family: var(--display); font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 900; color: var(--text-pri); line-height: 1.0; margin: 0 0 10px; letter-spacing: -1px; }
-.hero-title span { color: var(--accent); }
-.hero-sub { font-size: 0.95rem; color: var(--text-sec); margin: 0 0 24px; font-weight: 300; max-width: 520px; }
-.stat-row { display: flex; gap: 10px; flex-wrap: wrap; }
-.stat-chip { background: var(--bg-elevated); border: 1px solid var(--border-dim); border-radius: var(--r-sm); padding: 10px 16px; text-align: center; min-width: 80px; }
-.stat-chip .n { font-family: var(--display); font-size: 1.5rem; font-weight: 800; color: var(--accent); display: block; line-height: 1; }
-.stat-chip .l { font-size: 0.65rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 3px; display: block; }
+.hero-rank { display:inline-flex; align-items:center; gap:8px; background:var(--accent-dim); border:1px solid var(--border-glow); border-radius:4px; padding:4px 12px; font-family:var(--mono); font-size:0.7rem; color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin-bottom:14px; }
+.hero-title { font-family:var(--display); font-size:clamp(2.2rem,5vw,3.6rem); font-weight:900; color:var(--text-pri); line-height:1.0; margin:0 0 10px; letter-spacing:-1px; }
+.hero-title span { color:var(--accent); }
+.hero-sub { font-size:0.95rem; color:var(--text-sec); margin:0 0 24px; font-weight:300; max-width:520px; }
+.stat-row { display:flex; gap:10px; flex-wrap:wrap; }
+.stat-chip { background:var(--bg-elevated); border:1px solid var(--border-dim); border-radius:var(--r-sm); padding:10px 16px; text-align:center; min-width:80px; }
+.stat-chip .n { font-family:var(--display); font-size:1.5rem; font-weight:800; color:var(--accent); display:block; line-height:1; }
+.stat-chip .l { font-size:0.65rem; color:var(--text-sec); text-transform:uppercase; letter-spacing:0.8px; margin-top:3px; display:block; }
 
 /* ── Section header ── */
-.sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.sec-head-line { width: 3px; height: 20px; background: var(--accent); border-radius: 2px; flex-shrink: 0; }
-.sec-head-text { font-family: var(--display); font-size: 1.15rem; font-weight: 700; color: var(--text-pri); letter-spacing: 0.5px; text-transform: uppercase; }
+.sec-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.sec-head-line { width:3px; height:20px; background:var(--accent); border-radius:2px; flex-shrink:0; }
+.sec-head-text { font-family:var(--display); font-size:1.15rem; font-weight:700; color:var(--text-pri); letter-spacing:0.5px; text-transform:uppercase; }
 
 /* ── Arena Cards ── */
-.arena-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
-.arena-card { background: var(--bg-surface); border: 1px solid var(--border-dim); border-radius: var(--r-md); padding: 20px 18px 18px; position: relative; overflow: hidden; }
-.arena-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--card-accent, var(--accent)); opacity: 0.7; }
-.arena-card .ac-icon { font-size: 1.8rem; display: block; margin-bottom: 8px; }
-.arena-card .ac-title { font-family: var(--display); font-size: 1.05rem; font-weight: 800; color: var(--text-pri); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
-.arena-card .ac-desc { font-size: 0.78rem; color: var(--text-sec); line-height: 1.5; margin-bottom: 12px; }
-.arena-card .ac-meta { display: flex; gap: 6px; flex-wrap: wrap; }
-.meta-tag { font-family: var(--mono); font-size: 0.63rem; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--border-glow); border-radius: 3px; padding: 2px 6px; text-transform: uppercase; }
+.arena-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:20px; }
+.arena-card { background:var(--bg-surface); border:1px solid var(--border-dim); border-radius:var(--r-md); padding:20px 18px 18px; position:relative; overflow:hidden; }
+.arena-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--card-accent,var(--accent)); opacity:0.7; }
+.arena-card .ac-icon { font-size:1.8rem; display:block; margin-bottom:8px; }
+.arena-card .ac-title { font-family:var(--display); font-size:1.05rem; font-weight:800; color:var(--text-pri); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px; }
+.arena-card .ac-desc { font-size:0.78rem; color:var(--text-sec); line-height:1.5; margin-bottom:12px; }
+.arena-card .ac-meta { display:flex; gap:6px; flex-wrap:wrap; }
+.meta-tag { font-family:var(--mono); font-size:0.63rem; color:var(--accent); background:var(--accent-dim); border:1px solid var(--border-glow); border-radius:3px; padding:2px 6px; text-transform:uppercase; }
+
+/* ── Maraton Progress Bar (sesi) ── */
+.maraton-track { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+.maraton-step { flex:1; min-width:100px; background:var(--bg-elevated); border:1px solid var(--border-dim); border-radius:var(--r-sm); padding:10px 12px; text-align:center; position:relative; }
+.maraton-step.active { border-color:var(--accent); background:var(--accent-dim); }
+.maraton-step.done { border-color:rgba(57,211,83,0.4); background:rgba(57,211,83,0.07); }
+.maraton-step .ms-icon { font-size:1.3rem; display:block; }
+.maraton-step .ms-label { font-family:var(--display); font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-sec); margin-top:4px; display:block; }
+.maraton-step.active .ms-label { color:var(--accent); }
+.maraton-step.done .ms-label { color:var(--green-ok); }
+.maraton-step .ms-skor { font-family:var(--mono); font-size:0.65rem; color:var(--green-ok); display:block; margin-top:2px; }
 
 /* ── Leaderboard ── */
-.lb-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-.lb-table th { font-family: var(--mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); padding: 8px 10px; border-bottom: 1px solid var(--border-dim); text-align: left; }
-.lb-table td { padding: 9px 10px; border-bottom: 1px solid var(--border-dim); color: var(--text-pri); vertical-align: middle; }
-.lb-table tr:last-child td { border-bottom: none; }
-.lb-table tr:hover td { background: var(--bg-elevated); }
-.lb-rank { font-family: var(--mono); font-weight: 700; font-size: 0.9rem; }
-.lb-rank.r1 { color: var(--gold); } .lb-rank.r2 { color: #c0c0c0; } .lb-rank.r3 { color: #cd7f32; } .lb-rank.rx { color: var(--text-dim); }
-.lb-score { font-family: var(--display); font-size: 1.1rem; font-weight: 800; color: var(--accent); }
-.lb-sesi { font-family: var(--mono); font-size: 0.68rem; color: var(--text-sec); background: var(--bg-elevated); border-radius: 3px; padding: 2px 6px; }
-/* New: podium highlight untuk top 3 */
-.lb-row-1 td { background: rgba(227,179,65,0.05) !important; }
-.lb-row-2 td { background: rgba(192,192,192,0.04) !important; }
-.lb-row-3 td { background: rgba(205,127,50,0.04) !important; }
+.lb-table { width:100%; border-collapse:collapse; font-size:0.86rem; }
+.lb-table th { font-family:var(--mono); font-size:0.62rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); padding:8px 10px; border-bottom:1px solid var(--border-dim); text-align:left; }
+.lb-table td { padding:9px 10px; border-bottom:1px solid var(--border-dim); color:var(--text-pri); vertical-align:middle; }
+.lb-table tr:last-child td { border-bottom:none; }
+.lb-table tr:hover td { background:var(--bg-elevated); }
+.lb-rank { font-family:var(--mono); font-weight:700; font-size:0.9rem; }
+.lb-rank.r1{color:var(--gold);} .lb-rank.r2{color:#c0c0c0;} .lb-rank.r3{color:#cd7f32;} .lb-rank.rx{color:var(--text-dim);}
+.lb-score { font-family:var(--display); font-size:1.1rem; font-weight:800; color:var(--accent); }
+.lb-sesi { font-family:var(--mono); font-size:0.68rem; color:var(--text-sec); background:var(--bg-elevated); border-radius:3px; padding:2px 6px; }
+.lb-row-1 td{background:rgba(227,179,65,0.05)!important;}
+.lb-row-2 td{background:rgba(192,192,192,0.04)!important;}
+.lb-row-3 td{background:rgba(205,127,50,0.04)!important;}
 
 /* ── Sim Header ── */
-.sim-hdr { background: var(--bg-panel); border: 1px solid var(--border-dim); border-top: 2px solid var(--accent); border-radius: var(--r-md); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
-.sim-hdr-left .sesi-label { font-family: var(--mono); font-size: 0.62rem; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
-.sim-hdr-left .sesi-title { font-family: var(--display); font-size: 1.35rem; font-weight: 800; color: var(--text-pri); letter-spacing: 0.5px; }
-.timer-box { background: var(--bg-elevated); border: 1px solid var(--border-dim); border-radius: var(--r-sm); padding: 7px 16px; font-family: var(--mono); font-size: 1.4rem; font-weight: 700; color: var(--green-ok); min-width: 90px; text-align: center; transition: color 0.3s, border-color 0.3s; }
-.timer-box.warn { color: var(--gold); border-color: rgba(227,179,65,0.4); }
-.timer-box.crit { color: var(--red-alert); border-color: rgba(248,81,73,0.4); animation: pulse-red 0.5s ease-in-out infinite alternate; }
-@keyframes pulse-red { from { box-shadow: none; } to { box-shadow: 0 0 12px rgba(248,81,73,0.35); } }
+.sim-hdr { background:var(--bg-panel); border:1px solid var(--border-dim); border-top:2px solid var(--accent); border-radius:var(--r-md); padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+.sim-hdr-left .sesi-label { font-family:var(--mono); font-size:0.62rem; color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; }
+.sim-hdr-left .sesi-title { font-family:var(--display); font-size:1.35rem; font-weight:800; color:var(--text-pri); letter-spacing:0.5px; }
+.timer-box { background:var(--bg-elevated); border:1px solid var(--border-dim); border-radius:var(--r-sm); padding:7px 16px; font-family:var(--mono); font-size:1.4rem; font-weight:700; color:var(--green-ok); min-width:90px; text-align:center; transition:color 0.3s,border-color 0.3s; }
+.timer-box.warn { color:var(--gold); border-color:rgba(227,179,65,0.4); }
+.timer-box.crit { color:var(--red-alert); border-color:rgba(248,81,73,0.4); animation:pulse-red 0.5s ease-in-out infinite alternate; }
+@keyframes pulse-red { from{box-shadow:none;} to{box-shadow:0 0 12px rgba(248,81,73,0.35);} }
 
 /* ── Question Box ── */
-.q-box { background: var(--bg-surface); border: 1px solid var(--border-dim); border-radius: var(--r-md); padding: 24px 22px; margin-bottom: 18px; }
-.q-num { font-family: var(--mono); font-size: 0.63rem; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
-.q-text { font-size: 1rem; color: var(--text-pri); line-height: 1.7; font-weight: 400; }
+.q-box { background:var(--bg-surface); border:1px solid var(--border-dim); border-radius:var(--r-md); padding:24px 22px; margin-bottom:18px; }
+.q-num { font-family:var(--mono); font-size:0.63rem; color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin-bottom:10px; }
+.q-text { font-size:1rem; color:var(--text-pri); line-height:1.7; font-weight:400; }
 
-/* ── Likert Scale ── */
-.likert-label { font-family: var(--mono); font-size: 0.62rem; color: var(--text-sec); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
-.likert-scale { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
-.likert-opt { flex: 1; min-width: 100px; background: var(--bg-elevated); border: 1px solid var(--border-dim); border-radius: var(--r-sm); padding: 10px 8px; text-align: center; cursor: pointer; transition: all 0.15s; }
-.likert-opt:hover { border-color: var(--border-glow); background: var(--bg-surface); }
-.likert-opt .lo-huruf { font-family: var(--display); font-size: 1.1rem; font-weight: 800; color: var(--accent); display: block; }
-.likert-opt .lo-label { font-size: 0.7rem; color: var(--text-sec); display: block; margin-top: 3px; line-height: 1.3; }
-.arah-badge { display: inline-block; font-family: var(--mono); font-size: 0.6rem; letter-spacing: 1px; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; margin-top: 8px; }
-.arah-badge.positif { background: rgba(57,211,83,0.12); border: 1px solid rgba(57,211,83,0.3); color: #39d353; }
-.arah-badge.negatif { background: rgba(248,81,73,0.12); border: 1px solid rgba(248,81,73,0.3); color: #f85149; }
+/* ── Likert ── */
+.likert-label { font-family:var(--mono); font-size:0.62rem; color:var(--text-sec); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:10px; }
+.arah-badge { display:inline-block; font-family:var(--mono); font-size:0.6rem; letter-spacing:1px; text-transform:uppercase; padding:2px 8px; border-radius:3px; margin-top:8px; }
+.arah-badge.positif { background:rgba(57,211,83,0.12); border:1px solid rgba(57,211,83,0.3); color:#39d353; }
+.arah-badge.negatif { background:rgba(248,81,73,0.12); border:1px solid rgba(248,81,73,0.3); color:#f85149; }
 
 /* ── Kecermatan ── */
-.kunci-grid { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
-.kunci-char { background: var(--bg-elevated); border: 1px solid var(--accent); border-radius: var(--r-sm); padding: 9px 14px; font-family: var(--mono); font-size: 1.05rem; font-weight: 700; color: var(--accent); min-width: 42px; text-align: center; }
-.tampilan-box { font-family: var(--mono); font-size: 1.3rem; letter-spacing: 7px; color: var(--text-pri); background: var(--bg-elevated); border: 1px solid var(--border-dim); border-radius: var(--r-sm); padding: 12px 18px; display: inline-block; margin: 10px 0; }
-.missing-hint { font-family: var(--mono); font-size: 0.68rem; color: var(--text-sec); margin-top: 6px; }
+.kunci-grid { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:14px; }
+.kunci-char { background:var(--bg-elevated); border:1px solid var(--accent); border-radius:var(--r-sm); padding:9px 14px; font-family:var(--mono); font-size:1.05rem; font-weight:700; color:var(--accent); min-width:42px; text-align:center; }
+.tampilan-box { font-family:var(--mono); font-size:1.3rem; letter-spacing:7px; color:var(--text-pri); background:var(--bg-elevated); border:1px solid var(--border-dim); border-radius:var(--r-sm); padding:12px 18px; display:inline-block; margin:10px 0; }
+.missing-hint { font-family:var(--mono); font-size:0.68rem; color:var(--text-sec); margin-top:6px; }
 
-/* ── Pass Hand YA/TIDAK ── */
-.pernyataan-box { background: var(--bg-surface); border: 1px solid var(--border-dim); border-left: 3px solid var(--accent); border-radius: var(--r-md); padding: 24px 22px; margin-bottom: 18px; font-size: 1.05rem; color: var(--text-pri); line-height: 1.7; }
-.nav-progress { font-family: var(--mono); font-size: 0.68rem; color: var(--text-sec); text-align: center; margin-bottom: 10px; }
-.answered-badge { display: inline-block; background: var(--accent-dim); border: 1px solid var(--border-glow); border-radius: 3px; padding: 2px 8px; font-family: var(--mono); font-size: 0.62rem; color: var(--accent); text-transform: uppercase; margin-left: 8px; }
+/* ── Pass Hand ── */
+.pernyataan-box { background:var(--bg-surface); border:1px solid var(--border-dim); border-left:3px solid var(--accent); border-radius:var(--r-md); padding:24px 22px; margin-bottom:18px; font-size:1.05rem; color:var(--text-pri); line-height:1.7; }
 
-/* ── Score Result ── */
-.result-box { background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-surface) 100%); border: 1px solid var(--border-glow); border-top: 3px solid var(--accent); border-radius: var(--r-lg); padding: 40px 28px; text-align: center; }
-.result-label { font-family: var(--mono); font-size: 0.63rem; color: var(--accent); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; }
-.result-score { font-family: var(--display); font-size: 5rem; font-weight: 900; color: var(--text-pri); line-height: 1; margin: 6px 0 4px; }
-.result-verdict { font-size: 1rem; color: var(--text-sec); margin-top: 8px; }
-.result-bar-wrap { background: var(--bg-elevated); border-radius: 3px; height: 6px; max-width: 280px; margin: 16px auto 0; overflow: hidden; }
-.result-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-ember)); transition: width 0.8s ease; }
-
-/* ── Auth ── */
-.auth-shell { max-width: 420px; margin: 60px auto 0; }
-.auth-logo { text-align: center; margin-bottom: 26px; }
-.auth-logo .badge { font-family: var(--mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; display: block; }
-.auth-logo .name { font-family: var(--display); font-size: 2.3rem; font-weight: 900; color: var(--text-pri); letter-spacing: -1px; }
-.auth-logo .name span { color: var(--accent); }
-.auth-logo .sub { font-size: 0.8rem; color: var(--text-sec); margin-top: 4px; }
-.pay-box { background: var(--bg-surface); border: 1px solid var(--border-glow); border-left: 3px solid var(--accent); border-radius: var(--r-md); padding: 16px 14px; margin-top: 14px; }
-.pay-box h5 { font-family: var(--display); font-size: 0.92rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px; }
-.pay-row { font-size: 0.8rem; color: var(--text-sec); padding: 5px 0; border-bottom: 1px solid var(--border-dim); display: flex; gap: 7px; }
-.pay-row:last-child { border-bottom: none; }
-.pay-row strong { color: var(--text-pri); }
+/* ── Nav ── */
+.nav-progress { font-family:var(--mono); font-size:0.68rem; color:var(--text-sec); text-align:center; margin-bottom:10px; }
+.answered-badge { display:inline-block; background:var(--accent-dim); border:1px solid var(--border-glow); border-radius:3px; padding:2px 8px; font-family:var(--mono); font-size:0.62rem; color:var(--accent); text-transform:uppercase; margin-left:8px; }
 
 /* ── Progress Bar ── */
-.prog-wrap { background: var(--bg-elevated); border-radius: 3px; height: 4px; margin-bottom: 16px; overflow: hidden; }
-.prog-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-ember)); border-radius: 3px; transition: width 0.3s ease; }
+.prog-wrap { background:var(--bg-elevated); border-radius:3px; height:4px; margin-bottom:16px; overflow:hidden; }
+.prog-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-ember)); border-radius:3px; transition:width 0.3s ease; }
+
+/* ── Hasil Akhir ── */
+.final-box { background:linear-gradient(135deg,var(--bg-panel) 0%,var(--bg-surface) 100%); border:1px solid var(--border-glow); border-top:3px solid var(--accent); border-radius:var(--r-lg); padding:40px 28px; text-align:center; margin-bottom:24px; }
+.final-label { font-family:var(--mono); font-size:0.63rem; color:var(--accent); letter-spacing:3px; text-transform:uppercase; margin-bottom:10px; }
+.final-score { font-family:var(--display); font-size:5rem; font-weight:900; color:var(--text-pri); line-height:1; margin:6px 0 4px; }
+.final-status-ms  { font-family:var(--display); font-size:1.8rem; font-weight:900; color:var(--green-ok); letter-spacing:2px; }
+.final-status-tms { font-family:var(--display); font-size:1.8rem; font-weight:900; color:var(--red-alert); letter-spacing:2px; }
+.final-bar-wrap { background:var(--bg-elevated); border-radius:3px; height:8px; max-width:320px; margin:16px auto 0; overflow:hidden; }
+.final-bar-fill-ms  { height:100%; border-radius:3px; background:linear-gradient(90deg,#39d353,#2ea043); transition:width 0.8s ease; }
+.final-bar-fill-tms { height:100%; border-radius:3px; background:linear-gradient(90deg,#f85149,#da3633); transition:width 0.8s ease; }
+
+/* ── Skor Per Sesi ── */
+.skor-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin:20px 0; }
+.skor-card { background:var(--bg-elevated); border:1px solid var(--border-dim); border-radius:var(--r-md); padding:16px; text-align:center; }
+.skor-card .sk-label { font-family:var(--mono); font-size:0.6rem; color:var(--text-sec); letter-spacing:1.5px; text-transform:uppercase; display:block; margin-bottom:6px; }
+.skor-card .sk-val { font-family:var(--display); font-size:2.2rem; font-weight:900; color:var(--accent); display:block; line-height:1; }
+.skor-card .sk-bar-wrap { background:var(--bg-surface); border-radius:2px; height:4px; margin-top:8px; overflow:hidden; }
+.skor-card .sk-bar-fill { height:100%; border-radius:2px; background:var(--accent); }
+
+/* ── Evaluasi / Review ── */
+.eval-item { background:var(--bg-surface); border:1px solid var(--border-dim); border-radius:var(--r-md); padding:16px 18px; margin-bottom:10px; }
+.eval-item.salah { border-left:3px solid var(--red-alert); }
+.eval-item.benar { border-left:3px solid var(--green-ok); }
+.eval-q { font-size:0.9rem; color:var(--text-pri); line-height:1.6; margin-bottom:8px; }
+.eval-ans { font-family:var(--mono); font-size:0.75rem; display:flex; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+.eval-ans .user-ans { color:var(--red-alert); }
+.eval-ans .correct-ans { color:var(--green-ok); }
+.eval-pembahasan { font-size:0.8rem; color:var(--text-sec); line-height:1.6; background:var(--bg-elevated); border-radius:var(--r-sm); padding:10px 12px; margin-top:8px; }
+
+/* ── Auth ── */
+.auth-shell { max-width:420px; margin:60px auto 0; }
+.auth-logo { text-align:center; margin-bottom:26px; }
+.auth-logo .badge { font-family:var(--mono); font-size:0.7rem; color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin-bottom:10px; display:block; }
+.auth-logo .name { font-family:var(--display); font-size:2.3rem; font-weight:900; color:var(--text-pri); letter-spacing:-1px; }
+.auth-logo .name span { color:var(--accent); }
+.auth-logo .sub { font-size:0.8rem; color:var(--text-sec); margin-top:4px; }
+.pay-box { background:var(--bg-surface); border:1px solid var(--border-glow); border-left:3px solid var(--accent); border-radius:var(--r-md); padding:16px 14px; margin-top:14px; }
+.pay-box h5 { font-family:var(--display); font-size:0.92rem; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:1px; margin:0 0 10px; }
+.pay-row { font-size:0.8rem; color:var(--text-sec); padding:5px 0; border-bottom:1px solid var(--border-dim); display:flex; gap:7px; }
+.pay-row:last-child { border-bottom:none; }
+.pay-row strong { color:var(--text-pri); }
 
 /* ── Streamlit overrides ── */
 .stButton > button {
-    background: var(--accent) !important; color: #000 !important; border: none !important;
-    border-radius: var(--r-sm) !important; font-family: var(--display) !important;
-    font-size: 0.95rem !important; font-weight: 700 !important; letter-spacing: 0.5px !important;
-    text-transform: uppercase !important; padding: 9px 20px !important;
-    transition: all 0.15s ease !important; width: 100%;
+    background:var(--accent) !important; color:#000 !important; border:none !important;
+    border-radius:var(--r-sm) !important; font-family:var(--display) !important;
+    font-size:0.95rem !important; font-weight:700 !important; letter-spacing:0.5px !important;
+    text-transform:uppercase !important; padding:9px 20px !important;
+    transition:all 0.15s ease !important; width:100%;
 }
-.stButton > button:hover { background: var(--accent-ember) !important; transform: translateY(-1px) !important; box-shadow: 0 6px 18px rgba(251,107,0,0.35) !important; }
-.stTextInput > div > div > input { background: var(--bg-elevated) !important; border: 1px solid var(--border-dim) !important; border-radius: var(--r-sm) !important; color: var(--text-pri) !important; font-family: var(--body) !important; font-size: 0.88rem !important; padding: 9px 13px !important; }
-.stTextInput > div > div > input:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 2px var(--accent-dim) !important; }
-.stTextInput > label, .stSelectbox > label, .stRadio > label { color: var(--text-sec) !important; font-size: 0.78rem !important; font-family: var(--mono) !important; letter-spacing: 1px !important; text-transform: uppercase !important; }
-.stSelectbox > div > div { background: var(--bg-elevated) !important; border: 1px solid var(--border-dim) !important; border-radius: var(--r-sm) !important; color: var(--text-pri) !important; }
-.stTabs [data-baseweb="tab-list"] { background: var(--bg-elevated) !important; border-radius: var(--r-sm) !important; padding: 4px !important; gap: 4px !important; border: 1px solid var(--border-dim) !important; }
-.stTabs [data-baseweb="tab"] { border-radius: 5px !important; font-family: var(--display) !important; font-size: 0.92rem !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; color: var(--text-sec) !important; padding: 7px 14px !important; }
-.stTabs [aria-selected="true"] { background: var(--bg-panel) !important; color: var(--accent) !important; border: 1px solid var(--border-glow) !important; }
-.stRadio > div { gap: 7px !important; }
-.stRadio label { background: var(--bg-elevated) !important; border: 1px solid var(--border-dim) !important; border-radius: var(--r-sm) !important; padding: 9px 13px !important; color: var(--text-pri) !important; font-family: var(--body) !important; font-size: 0.88rem !important; transition: all 0.15s !important; cursor: pointer !important; }
-.stRadio label:hover { border-color: var(--border-glow) !important; background: var(--bg-surface) !important; }
-.stSidebar { background: var(--bg-panel) !important; border-right: 1px solid var(--border-dim) !important; }
-div[data-testid="stProgress"] > div { background: var(--bg-elevated) !important; }
-div[data-testid="stProgress"] > div > div { background: var(--accent) !important; }
-
-/* ── Responsive ── */
-@media (max-width: 640px) {
-    .arena-grid { grid-template-columns: 1fr; }
-    .stat-row { flex-direction: column; }
-    .stat-chip { min-width: unset; width: 100%; }
-    .sim-hdr { flex-direction: column; align-items: flex-start; }
-    .kunci-grid { gap: 5px; }
-    .kunci-char { min-width: 36px; padding: 7px 9px; font-size: 0.9rem; }
-    .result-score { font-size: 3.8rem; }
-    .hero-command { padding: 28px 20px 24px; }
-    .likert-scale { flex-direction: column; }
-    .likert-opt { min-width: unset; }
-}
+.stButton > button:hover { background:var(--accent-ember) !important; transform:translateY(-1px) !important; box-shadow:0 6px 18px rgba(251,107,0,0.35) !important; }
+.stTextInput > div > div > input { background:var(--bg-elevated) !important; border:1px solid var(--border-dim) !important; border-radius:var(--r-sm) !important; color:var(--text-pri) !important; font-family:var(--body) !important; font-size:0.88rem !important; padding:9px 13px !important; }
+.stTextInput > div > div > input:focus { border-color:var(--accent) !important; box-shadow:0 0 0 2px var(--accent-dim) !important; }
+.stTextInput > label,.stSelectbox > label,.stRadio > label { color:var(--text-sec) !important; font-size:0.78rem !important; font-family:var(--mono) !important; letter-spacing:1px !important; text-transform:uppercase !important; }
+.stSelectbox > div > div { background:var(--bg-elevated) !important; border:1px solid var(--border-dim) !important; border-radius:var(--r-sm) !important; color:var(--text-pri) !important; }
+.stTabs [data-baseweb="tab-list"] { background:var(--bg-elevated) !important; border-radius:var(--r-sm) !important; padding:4px !important; gap:4px !important; border:1px solid var(--border-dim) !important; }
+.stTabs [data-baseweb="tab"] { border-radius:5px !important; font-family:var(--display) !important; font-size:0.92rem !important; font-weight:700 !important; text-transform:uppercase !important; letter-spacing:0.5px !important; color:var(--text-sec) !important; padding:7px 14px !important; }
+.stTabs [aria-selected="true"] { background:var(--bg-panel) !important; color:var(--accent) !important; border:1px solid var(--border-glow) !important; }
+.stRadio > div { gap:7px !important; }
+.stRadio label { background:var(--bg-elevated) !important; border:1px solid var(--border-dim) !important; border-radius:var(--r-sm) !important; padding:9px 13px !important; color:var(--text-pri) !important; font-family:var(--body) !important; font-size:0.88rem !important; transition:all 0.15s !important; cursor:pointer !important; }
+.stRadio label:hover { border-color:var(--border-glow) !important; background:var(--bg-surface) !important; }
+.stSidebar { background:var(--bg-panel) !important; border-right:1px solid var(--border-dim) !important; }
+div[data-testid="stProgress"] > div { background:var(--bg-elevated) !important; }
+div[data-testid="stProgress"] > div > div { background:var(--accent) !important; }
 
 /* ── Footer ── */
-.footer-credit { text-align: center; padding: 22px 0 8px; font-size: 0.76rem; color: var(--text-dim); }
-.footer-credit a { color: var(--accent); text-decoration: none; font-weight: 600; }
-.footer-credit a:hover { color: var(--accent-ember); }
+.footer-credit { text-align:center; padding:22px 0 8px; font-size:0.76rem; color:var(--text-dim); }
+.footer-credit a { color:var(--accent); text-decoration:none; font-weight:600; }
+
+/* ── Responsive ── */
+@media (max-width:640px) {
+    .arena-grid,.skor-grid,.maraton-track { grid-template-columns:1fr; flex-direction:column; }
+    .stat-row { flex-direction:column; }
+    .final-score { font-size:3.8rem; }
+    .hero-command { padding:28px 20px 24px; }
+}
 </style>
 """, unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════
-# KONSTANTA SESI
+# SESI CONFIG
 # ══════════════════════════════════════════════
-SOAL_TOTAL = 10
-
 SESI_CONFIG = {
-    "Pass Hand":   {"icon": "📋", "label": "PASS HAND",   "timer": 45, "navigasi": True},
-    "Kecerdasan":  {"icon": "🧠", "label": "KECERDASAN",  "timer": 35, "navigasi": True},
-    "Kecermatan":  {"icon": "🎯", "label": "KECERMATAN",  "timer": 20, "navigasi": False},
-    "Kepribadian": {"icon": "🧬", "label": "KEPRIBADIAN", "timer": 45, "navigasi": True},
+    "Pass Hand":   {"icon": "📋", "label": "PASS HAND",   "timer": 45, "color": "#fb6b00"},
+    "Kecerdasan":  {"icon": "🧠", "label": "KECERDASAN",  "timer": 35, "color": "#39d353"},
+    "Kepribadian": {"icon": "🧬", "label": "KEPRIBADIAN", "timer": 45, "color": "#bc8cff"},
+    "Kecermatan":  {"icon": "🎯", "label": "KECERMATAN",  "timer": 20, "color": "#58a6ff"},
 }
 
 
@@ -321,7 +311,7 @@ def login_user(username: str, password: str):
             st.markdown("""
                 <div class="pay-box">
                     <h5>⏳ Akun Belum Aktif</h5>
-                    <div class="pay-row">📱 <span>Kirim bukti bayar via <strong>WhatsApp</strong></span></div>
+                    <div class="pay-row">📱 Kirim bukti bayar via <strong>WhatsApp</strong></div>
                     <div class="pay-row">📞 <strong>0853-6637-4530</strong></div>
                     <div class="pay-row">🏦 BRI: <strong>1234-5678-9012-3456</strong> a.n. Growing Together</div>
                     <div class="pay-row">💰 Biaya Aktivasi: <strong>Rp 25.000</strong></div>
@@ -338,18 +328,26 @@ def register_user(username: str, password: str) -> bool:
     except Exception:
         return False
 
-def save_score(username: str, sesi: str, skor: int):
+def save_score_maraton(username: str, rata_rata: int, status: str):
+    """Simpan skor maraton (rata-rata semua sesi) ke tabel scores."""
     try:
-        supabase.table("scores").insert({"username": username, "sesi": sesi, "skor": skor}).execute()
+        supabase.table("scores").insert({
+            "username": username,
+            "sesi": "MARATON",
+            "skor": rata_rata,
+            "status": status,
+        }).execute()
     except Exception:
         pass
 
-def get_leaderboard(sesi: str = "Semua", limit: int = 5) -> list:
+def get_leaderboard(limit: int = 5) -> list:
     try:
-        if sesi == "Semua":
-            res = supabase.table("scores").select("username, sesi, skor").order("skor", desc=True).limit(limit).execute()
-        else:
-            res = supabase.table("scores").select("username, sesi, skor").eq("sesi", sesi).order("skor", desc=True).limit(limit).execute()
+        res = supabase.table("scores")\
+            .select("username, skor, status")\
+            .eq("sesi", "MARATON")\
+            .order("skor", desc=True)\
+            .limit(limit)\
+            .execute()
         return res.data or []
     except Exception:
         return []
@@ -358,32 +356,22 @@ def get_leaderboard(sesi: str = "Semua", limit: int = 5) -> list:
 # ══════════════════════════════════════════════
 # LEADERBOARD COMPONENT
 # ══════════════════════════════════════════════
-def display_leaderboard(filter_key: str = "lb_filter_home"):
-    """
-    Komponen leaderboard lengkap: filter sesi + tabel Top 5 + skor user sendiri.
-    Bisa dipanggil dari halaman mana pun.
-    """
-    filter_sesi = st.selectbox(
-        "Filter Sesi:",
-        ["Semua", "Pass Hand", "Kecerdasan", "Kecermatan", "Kepribadian"],
-        label_visibility="collapsed",
-        key=filter_key,
-    )
-    rows = get_leaderboard(filter_sesi, limit=5)
-
+def display_leaderboard():
+    rows = get_leaderboard(limit=5)
     medal_map = {1: ("🥇", "r1"), 2: ("🥈", "r2"), 3: ("🥉", "r3")}
     rows_html = ""
     for i, row in enumerate(rows, 1):
         medal, cls = medal_map.get(i, ("", "rx"))
-        uname = row.get("username", "—")
-        skor  = row.get("skor", 0)
-        sesi  = row.get("sesi", "—")
+        uname  = row.get("username", "—")
+        skor   = row.get("skor", 0)
+        status = row.get("status", "—")
+        st_color = "#39d353" if status == "MS" else "#f85149"
         row_cls = f"lb-row-{i}" if i <= 3 else ""
         rows_html += f"""
         <tr class="{row_cls}">
             <td><span class="lb-rank {cls}">{medal or f'#{i}'}</span></td>
             <td style="font-weight:600;">{uname}</td>
-            <td><span class="lb-sesi">{sesi}</span></td>
+            <td><span style="font-family:var(--mono);font-size:0.72rem;color:{st_color};font-weight:700;">{status}</span></td>
             <td><span class="lb-score">{skor}</span></td>
         </tr>"""
 
@@ -393,47 +381,30 @@ def display_leaderboard(filter_key: str = "lb_filter_home"):
     st.markdown(f"""
         <div class="panel" style="padding:18px;">
             <table class="lb-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Username</th>
-                        <th>Sesi</th>
-                        <th>Skor</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>#</th><th>Username</th><th>Status</th><th>Rata-rata</th></tr></thead>
                 <tbody>{rows_html}</tbody>
             </table>
         </div>
     """, unsafe_allow_html=True)
 
     # Skor terbaik user sendiri
-    my_scores = []
     try:
-        res = supabase.table("scores").select("sesi, skor")\
+        res = supabase.table("scores").select("skor, status")\
             .eq("username", st.session_state.get("username", ""))\
-            .order("skor", desc=True).limit(4).execute()
-        my_scores = res.data or []
+            .eq("sesi", "MARATON")\
+            .order("skor", desc=True).limit(1).execute()
+        my = res.data or []
     except Exception:
-        pass
+        my = []
 
-    if my_scores:
-        st.markdown("""
-            <div class="sec-head" style="margin-top:18px;">
-                <div class="sec-head-line"></div>
-                <div class="sec-head-text">Skor Terbaik Lo</div>
-            </div>
-        """, unsafe_allow_html=True)
-        my_rows = "".join(
-            f'<tr><td><span class="lb-sesi">{s["sesi"]}</span></td>'
-            f'<td><span class="lb-score">{s["skor"]}</span></td></tr>'
-            for s in my_scores
-        )
+    if my:
+        best = my[0]
+        st_color = "#39d353" if best.get("status") == "MS" else "#f85149"
         st.markdown(f"""
-            <div class="panel" style="padding:14px 18px;">
-                <table class="lb-table">
-                    <thead><tr><th>Sesi</th><th>Best</th></tr></thead>
-                    <tbody>{my_rows}</tbody>
-                </table>
+            <div class="panel-sm" style="margin-top:12px;text-align:center;">
+                <span style="font-family:var(--mono);font-size:0.62rem;color:var(--text-sec);letter-spacing:1.5px;text-transform:uppercase;">BEST SCORE LO</span>
+                <div style="font-family:var(--display);font-size:2.4rem;font-weight:900;color:{st_color};">{best['skor']}</div>
+                <div style="font-family:var(--mono);font-size:0.75rem;color:{st_color};">● {best.get('status','—')}</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -444,9 +415,9 @@ def display_leaderboard(filter_key: str = "lb_filter_home"):
 def show_auth():
     st.markdown("""
         <div class="auth-logo">
-            <span class="badge">[ CAT SYSTEM v3.1 ]</span>
+            <span class="badge">[ CAT SYSTEM v4.0 ]</span>
             <div class="name">PSYCHO<span>TECH</span></div>
-            <div class="sub">Platform Simulasi CAT Psikotes Polri</div>
+            <div class="sub">Platform Simulasi CAT Psikotes Polri — Marathon Edition</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -493,7 +464,6 @@ def show_auth():
                     <div class="pay-row">✅ Aktivasi <strong>dalam 1×24 jam</strong></div>
                 </div>
             """, unsafe_allow_html=True)
-
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("""
@@ -510,13 +480,14 @@ def show_auth():
 def show_home():
     st.markdown(f"""
         <div class="hero-command">
-            <div class="hero-rank">[ SISTEM AKTIF ]</div>
-            <h1 class="hero-title">ARENA<br><span>KOMPETISI</span><br>CAT POLRI</h1>
-            <p class="hero-sub">Simulasi psikotes paling dekat dengan kondisi ujian asli. Latih dirimu, kalahkan kompetitor.</p>
+            <div class="hero-rank">[ MARATON v4.0 — SEMUA SESI ]</div>
+            <h1 class="hero-title">ARENA<br><span>MARATON</span><br>CAT POLRI</h1>
+            <p class="hero-sub">Simulasi 4 sesi berurutan: Pass Hand → Kecerdasan → Kepribadian → Kecermatan.
+            Nilai hanya muncul di akhir. Passing Grade rata-rata <b style="color:var(--accent);">≥ {PASSING_GRADE}</b>.</p>
             <div class="stat-row">
-                <div class="stat-chip"><span class="n">1.500+</span><span class="l">Casis Lulus</span></div>
                 <div class="stat-chip"><span class="n">4</span><span class="l">Sesi Ujian</span></div>
-                <div class="stat-chip"><span class="n">98%</span><span class="l">Akurasi Soal</span></div>
+                <div class="stat-chip"><span class="n">{SOAL_PER_SESI*4}</span><span class="l">Total Soal</span></div>
+                <div class="stat-chip"><span class="n">{PASSING_GRADE}</span><span class="l">Passing Grade</span></div>
                 <div class="stat-chip"><span class="n">24/7</span><span class="l">Akses Penuh</span></div>
             </div>
         </div>
@@ -526,14 +497,15 @@ def show_home():
 
     with col_main:
         st.markdown("""
-            <div class="sec-head"><div class="sec-head-line"></div><div class="sec-head-text">Pilih Sesi Latihan</div></div>
+            <div class="sec-head"><div class="sec-head-line"></div>
+            <div class="sec-head-text">Urutan Sesi Maraton</div></div>
         """, unsafe_allow_html=True)
 
         sesi_data = [
-            {"key": "Pass Hand",   "icon": "📋", "title": "PASS HAND",   "desc": "10 pernyataan YA/TIDAK untuk mengukur profil kepribadian polisi. Tidak ada benar/salah — hanya kejujuran.", "tags": ["10 Pernyataan", "Profiling", "45 Detik/Soal"], "accent": "#fb6b00"},
-            {"key": "Kecerdasan",  "icon": "🧠", "title": "KECERDASAN",  "desc": "Logika, numerik, verbal, spasial & mata angin. AI + template lokal. Benar +5, Salah 0.", "tags": ["10 Soal", "+5 per Benar", "AI + Lokal"], "accent": "#39d353"},
-            {"key": "Kecermatan",  "icon": "🎯", "title": "KECERMATAN",  "desc": "Temukan karakter hilang dari kunci 5 kolom (format 2025). Klik = langsung submit. Ukur ketahanan.", "tags": ["10 Soal", "Auto-Submit", "Ketahanan"], "accent": "#58a6ff"},
-            {"key": "Kepribadian", "icon": "🧬", "title": "KEPRIBADIAN", "desc": "Skala Likert 5 tingkat (Sangat Setuju — Sangat Tidak Setuju). Skor adaptif arah pernyataan.", "tags": ["10 Soal", "Likert 1–5", "Navigasi"], "accent": "#bc8cff"},
+            {"key": "Pass Hand",   "icon": "📋", "title": "PASS HAND",   "desc": "10 pernyataan YA/TIDAK profiling polisi. Kejujuran adalah kuncinya.", "tags": ["Sesi 1", "10 Soal", "45 Dtk/Soal"], "accent": "#fb6b00"},
+            {"key": "Kecerdasan",  "icon": "🧠", "title": "KECERDASAN",  "desc": "Matematika dasar, spasial, verbal, logika & mata angin 2025.", "tags": ["Sesi 2", "10 Soal", "+10 per Benar"], "accent": "#39d353"},
+            {"key": "Kepribadian", "icon": "🧬", "title": "KEPRIBADIAN", "desc": "Skala Likert 5 tingkat. Skor adaptif berdasarkan arah pernyataan.", "tags": ["Sesi 3", "10 Soal", "Likert 1-5"], "accent": "#bc8cff"},
+            {"key": "Kecermatan",  "icon": "🎯", "title": "KECERMATAN",  "desc": "Temukan karakter hilang dari kunci kolom. Auto-submit via klik.", "tags": ["Sesi 4", "10 Soal", "Auto-Submit"], "accent": "#58a6ff"},
         ]
 
         st.markdown('<div class="arena-grid">', unsafe_allow_html=True)
@@ -549,26 +521,17 @@ def show_home():
             """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        r1c1, r1c2 = st.columns(2)
-        r2c1, r2c2 = st.columns(2)
-        btn_map = [
-            (r1c1, "Pass Hand",   "📋 MULAI PASS HAND"),
-            (r1c2, "Kecerdasan",  "🧠 MULAI KECERDASAN"),
-            (r2c1, "Kecermatan",  "🎯 MULAI KECERMATAN"),
-            (r2c2, "Kepribadian", "🧬 MULAI KEPRIBADIAN"),
-        ]
-        for col, sesi_key, label in btn_map:
-            with col:
-                if st.button(label, key=f"start_{sesi_key}", use_container_width=True):
-                    _init_sesi(sesi_key)
-                    st.session_state.page = "simulasi"
-                    st.rerun()
+        if st.button("🚀 MULAI MARATON — 4 SESI BERURUTAN", key="start_maraton", use_container_width=True):
+            _init_maraton()
+            st.session_state.page = "simulasi"
+            st.rerun()
 
     with col_lb:
         st.markdown("""
-            <div class="sec-head"><div class="sec-head-line"></div><div class="sec-head-text">🏆 Leaderboard Top 5</div></div>
+            <div class="sec-head"><div class="sec-head-line"></div>
+            <div class="sec-head-text">🏆 Leaderboard Maraton</div></div>
         """, unsafe_allow_html=True)
-        display_leaderboard(filter_key="lb_filter_home")
+        display_leaderboard()
 
     st.markdown("""
         <div class="footer-credit">
@@ -579,74 +542,83 @@ def show_home():
 
 
 # ══════════════════════════════════════════════
-# SIMULASI HELPERS
+# INISIASI MARATON
 # ══════════════════════════════════════════════
+def _init_maraton():
+    """Inisialisasi state untuk satu putaran maraton penuh."""
+    st.session_state.mar_sesi_idx   = 0                  # index ke URUTAN_MARATON
+    st.session_state.mar_step       = 0                  # soal ke-N dalam sesi aktif
+    st.session_state.mar_done       = False              # maraton selesai?
+    st.session_state.mar_hasil      = {}                 # {"Pass Hand": {...}, ...}
+    st.session_state.mar_start_sesi = time.time()        # waktu mulai sesi aktif
 
-def _gen_soal(sesi: str) -> dict:
-    if sesi == "Kecerdasan":
-        return generate_soal_kecerdasan()
-    elif sesi == "Kecermatan":
-        return generate_kecermatan()
+    # Pra-generate SEMUA soal untuk semua sesi sekaligus
+    st.session_state.mar_soal = {}
+    for sesi in URUTAN_MARATON:
+        st.session_state.mar_soal[sesi] = [generate_soal(sesi) for _ in range(SOAL_PER_SESI)]
+
+    st.session_state.mar_jawaban    = {s: [None] * SOAL_PER_SESI for s in URUTAN_MARATON}
+    st.session_state.mar_waktu_soal = {s: [None] * SOAL_PER_SESI for s in URUTAN_MARATON}
+    st.session_state.mar_waktu_kecermatan = []
+
+
+def _sesi_aktif() -> str:
+    return URUTAN_MARATON[st.session_state.mar_sesi_idx]
+
+
+def _selesai_sesi():
+    """
+    Hitung skor sesi aktif, simpan ke mar_hasil, lanjut ke sesi berikutnya.
+    Jika semua sesi selesai, set mar_done=True dan simpan ke Supabase.
+    """
+    sesi      = _sesi_aktif()
+    soal_list = st.session_state.mar_soal[sesi]
+    jawaban   = st.session_state.mar_jawaban[sesi]
+
+    if sesi == "Pass Hand":
+        hasil = skor_sesi_pass_hand(soal_list, jawaban)
+    elif sesi == "Kecerdasan":
+        hasil = skor_sesi_kecerdasan(soal_list, jawaban)
     elif sesi == "Kepribadian":
-        return generate_soal_kepribadian()
+        hasil = skor_sesi_kepribadian(soal_list, jawaban)
+    else:  # Kecermatan
+        waktu = st.session_state.mar_waktu_kecermatan
+        hasil = skor_sesi_kecermatan(soal_list, jawaban, waktu)
+
+    st.session_state.mar_hasil[sesi] = hasil
+
+    # Lanjut atau selesai
+    next_idx = st.session_state.mar_sesi_idx + 1
+    if next_idx >= len(URUTAN_MARATON):
+        st.session_state.mar_done = True
+        # Simpan ke leaderboard
+        rekap = rekap_maraton({s: v["skor_100"] for s, v in st.session_state.mar_hasil.items()})
+        save_score_maraton(
+            st.session_state.get("username", "guest"),
+            rekap["rata_rata"],
+            rekap["status"],
+        )
+        st.session_state.mar_rekap = rekap
     else:
-        return generate_pass_hand()
-
-def _init_sesi(sesi: str):
-    cfg = SESI_CONFIG[sesi]
-    st.session_state.sim_sesi    = sesi
-    st.session_state.sim_step    = 0
-    st.session_state.sim_done    = False
-    st.session_state.sim_waktu_kecermatan = []
-
-    soal_list = [_gen_soal(sesi) for _ in range(SOAL_TOTAL)]
-    st.session_state.sim_soal_list  = soal_list
-    st.session_state.sim_jawaban    = [None] * SOAL_TOTAL
-    st.session_state.sim_waktu_soal = [None] * SOAL_TOTAL
-
-    st.session_state.sim_start_time = time.time()
-    st.session_state.sim_durasi     = cfg["timer"] * SOAL_TOTAL
-
-
-def _hitung_skor_akhir(sesi: str) -> int:
-    soal_list = st.session_state.sim_soal_list
-    jawaban   = st.session_state.sim_jawaban
-    total = 0
-    for i, (soal, jwb) in enumerate(zip(soal_list, jawaban)):
-        if jwb is None:
-            continue
-        if sesi == "Kecerdasan":
-            huruf = str(jwb).split(".")[0].strip()
-            total += nilai_jawaban_kecerdasan(huruf, soal.get("jawaban", "A"))
-        elif sesi == "Kepribadian":
-            # jwb berisi huruf A/B/C/D/E
-            huruf = str(jwb).strip().upper()[0]
-            arah  = soal.get("arah", "positif")
-            total += nilai_jawaban_kepribadian(huruf, arah)
-        elif sesi == "Kecermatan":
-            total += nilai_jawaban_kecermatan(str(jwb).strip(), soal.get("jawaban", ""))
-        # Pass Hand: tidak ada skor numerik
-    return total
+        st.session_state.mar_sesi_idx   = next_idx
+        st.session_state.mar_step       = 0
+        st.session_state.mar_start_sesi = time.time()
 
 
 # ══════════════════════════════════════════════
-# SIMULASI — MAIN RENDERER
+# SIMULASI — MAIN
 # ══════════════════════════════════════════════
-
 def show_simulation():
-    sesi = st.session_state.get("sim_sesi", "Kecerdasan")
-    cfg  = SESI_CONFIG[sesi]
-
-    if st.session_state.get("sim_done", False):
-        _show_result(sesi)
+    if st.session_state.get("mar_done", False):
+        _show_hasil_akhir()
         return
 
-    step       = st.session_state.sim_step
-    soal_list  = st.session_state.sim_soal_list
-    soal       = soal_list[step]
-    display_no = step + 1
+    sesi  = _sesi_aktif()
+    cfg   = SESI_CONFIG[sesi]
+    step  = st.session_state.mar_step
+    soal  = st.session_state.mar_soal[sesi][step]
 
-    # ── Watermark username transparan ──
+    # ── Watermark username ──
     username_wm = st.session_state.get("username", "USER").upper()
     st.markdown(f"""
         <div class="sim-watermark">
@@ -657,72 +629,96 @@ def show_simulation():
         </div>
     """, unsafe_allow_html=True)
 
-    # ── Timer global ──
-    elapsed   = time.time() - st.session_state.sim_start_time
-    total_dur = st.session_state.sim_durasi
+    # ── Maraton Track ──
+    _render_maraton_track(sesi)
+
+    # ── Timer per sesi ──
+    elapsed   = time.time() - st.session_state.mar_start_sesi
+    total_dur = cfg["timer"] * SOAL_PER_SESI
     remaining = max(0, int(total_dur - elapsed))
 
     if remaining <= 0:
-        skor = _hitung_skor_akhir(sesi)
-        save_score(st.session_state.get("username", "guest"), sesi, skor)
-        st.session_state.sim_done = True
+        _selesai_sesi()
         st.rerun()
         return
 
-    # ── Sim Header ──
     timer_cls = "crit" if remaining <= 30 else ("warn" if remaining <= 60 else "")
     mins, secs = divmod(remaining, 60)
     timer_str  = f"{mins:02d}:{secs:02d}"
 
+    # ── Sim Header ──
+    sesi_no = URUTAN_MARATON.index(sesi) + 1
     st.markdown(f"""
         <div class="sim-hdr">
             <div class="sim-hdr-left">
-                <div class="sesi-label">[ SESI AKTIF ]</div>
+                <div class="sesi-label">[ SESI {sesi_no}/4 — MARATON ]</div>
                 <div class="sesi-title">{cfg['icon']} {cfg['label']}</div>
             </div>
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                 <div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);">
-                    SOAL {display_no}/{SOAL_TOTAL}
+                    SOAL {step+1}/{SOAL_PER_SESI}
                 </div>
                 <div class="timer-box {timer_cls}">{timer_str}</div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # ── Progress bar ──
-    pct = step / SOAL_TOTAL * 100
-    st.markdown(f'<div class="prog-wrap"><div class="prog-fill" style="width:{pct}%;"></div></div>', unsafe_allow_html=True)
+    # ── Progress bar dalam sesi ──
+    pct = step / SOAL_PER_SESI * 100
+    st.markdown(f'<div class="prog-wrap"><div class="prog-fill" style="width:{pct}%;"></div></div>',
+                unsafe_allow_html=True)
 
-    # ── Render sesi ──
-    if sesi == "Kecermatan":
-        _render_kecermatan(soal, step)
-    elif sesi == "Pass Hand":
+    # ── Render soal ──
+    if sesi == "Pass Hand":
         _render_pass_hand(soal, step)
     elif sesi == "Kecerdasan":
         _render_kecerdasan(soal, step)
     elif sesi == "Kepribadian":
         _render_kepribadian(soal, step)
-
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    if st.button("← Kembali ke Home", key="back_home"):
-        st.session_state.page = "home"
-        st.rerun()
+    elif sesi == "Kecermatan":
+        _render_kecermatan(soal, step)
 
     # Refresh timer
     time.sleep(1)
     st.rerun()
 
 
-# ── NAVIGASI HELPER ──
+def _render_maraton_track(sesi_aktif: str):
+    steps_html = ""
+    for s in URUTAN_MARATON:
+        idx_s    = URUTAN_MARATON.index(s)
+        idx_aktif = URUTAN_MARATON.index(sesi_aktif)
+        cfg_s    = SESI_CONFIG[s]
+
+        if idx_s < idx_aktif:
+            css   = "done"
+            skor_html = f'<span class="ms-skor">✓ {st.session_state.mar_hasil.get(s, {}).get("skor_100", 0)}</span>'
+        elif idx_s == idx_aktif:
+            css   = "active"
+            skor_html = '<span class="ms-skor">▶ Aktif</span>'
+        else:
+            css   = ""
+            skor_html = ""
+
+        steps_html += f"""
+        <div class="maraton-step {css}">
+            <span class="ms-icon">{cfg_s['icon']}</span>
+            <span class="ms-label">{cfg_s['label']}</span>
+            {skor_html}
+        </div>"""
+
+    st.markdown(f'<div class="maraton-track">{steps_html}</div>', unsafe_allow_html=True)
+
+
+# ── NAV BUTTONS (Pass Hand, Kecerdasan, Kepribadian) ──
 def _nav_buttons(step: int, sesi: str):
-    jawaban_step  = st.session_state.sim_jawaban[step]
+    jawaban_step  = st.session_state.mar_jawaban[sesi][step]
     sudah_jawab   = jawaban_step is not None
-    is_last       = (step == SOAL_TOTAL - 1)
-    answered_count = sum(1 for j in st.session_state.sim_jawaban if j is not None)
+    is_last       = (step == SOAL_PER_SESI - 1)
+    answered_count = sum(1 for j in st.session_state.mar_jawaban[sesi] if j is not None)
 
     st.markdown(
-        f'<div class="nav-progress">'
-        f'{answered_count}/{SOAL_TOTAL} soal terjawab'
+        f'<div class="nav-progress">{answered_count}/{SOAL_PER_SESI} soal terjawab'
         + (f'<span class="answered-badge">✓ Terjawab</span>' if sudah_jawab else '')
         + '</div>',
         unsafe_allow_html=True
@@ -731,21 +727,19 @@ def _nav_buttons(step: int, sesi: str):
     c1, c2, c3 = st.columns([1, 1, 1])
     with c1:
         if step > 0:
-            if st.button("← Sebelumnya", key=f"prev_{step}_{sesi}", use_container_width=True):
-                st.session_state.sim_step -= 1
+            if st.button("← Sebelumnya", key=f"prev_{sesi}_{step}", use_container_width=True):
+                st.session_state.mar_step -= 1
                 st.rerun()
     with c2:
         if not is_last:
-            if st.button("Selanjutnya →", key=f"next_{step}_{sesi}", use_container_width=True):
-                st.session_state.sim_step += 1
+            if st.button("Selanjutnya →", key=f"next_{sesi}_{step}", use_container_width=True):
+                st.session_state.mar_step += 1
                 st.rerun()
     with c3:
-        if is_last or answered_count == SOAL_TOTAL:
-            lbl = "✅ SELESAI" if is_last else f"SELESAI ({answered_count}/{SOAL_TOTAL})"
-            if st.button(lbl, key=f"finish_{step}_{sesi}", use_container_width=True):
-                skor = _hitung_skor_akhir(sesi)
-                save_score(st.session_state.get("username", "guest"), sesi, skor)
-                st.session_state.sim_done = True
+        if is_last or answered_count == SOAL_PER_SESI:
+            lbl = f"✅ SELESAI SESI" if is_last else f"SELESAI ({answered_count}/{SOAL_PER_SESI})"
+            if st.button(lbl, key=f"finish_{sesi}_{step}", use_container_width=True):
+                _selesai_sesi()
                 st.rerun()
 
 
@@ -753,28 +747,20 @@ def _nav_buttons(step: int, sesi: str):
 def _render_pass_hand(soal: dict, step: int):
     st.markdown(f"""
         <div class="q-box no-select">
-            <div class="q-num">PERNYATAAN {step + 1} &nbsp;/&nbsp; PROFILING POLISI</div>
-            <div class="pernyataan-box">{soal.get('pernyataan', '—')}</div>
-            <div style="font-size:0.78rem;color:var(--text-sec);margin-top:8px;">
-                {soal.get('instruksi', '')}
-            </div>
+            <div class="q-num">PERNYATAAN {step+1} &nbsp;/&nbsp; PROFILING POLISI</div>
+            <div class="pernyataan-box">{soal.get('pernyataan','—')}</div>
+            <div style="font-size:0.78rem;color:var(--text-sec);margin-top:8px;">{soal.get('instruksi','')}</div>
         </div>
     """, unsafe_allow_html=True)
 
-    opsi = ["YA", "TIDAK"]
-    current = st.session_state.sim_jawaban[step]
-    idx = opsi.index(current) if current in opsi else None
+    opsi    = ["YA", "TIDAK"]
+    current = st.session_state.mar_jawaban["Pass Hand"][step]
+    idx     = opsi.index(current) if current in opsi else None
 
     with st.form(key=f"form_ph_{step}"):
-        pilihan = st.radio(
-            "Jawaban Anda:",
-            opsi,
-            index=idx,
-            label_visibility="collapsed",
-            horizontal=True,
-        )
+        pilihan = st.radio("Jawaban:", opsi, index=idx, label_visibility="collapsed", horizontal=True)
         if st.form_submit_button("SIMPAN JAWABAN", use_container_width=True):
-            st.session_state.sim_jawaban[step] = pilihan
+            st.session_state.mar_jawaban["Pass Hand"][step] = pilihan
             st.rerun()
 
     _nav_buttons(step, "Pass Hand")
@@ -784,187 +770,240 @@ def _render_pass_hand(soal: dict, step: int):
 def _render_kecerdasan(soal: dict, step: int):
     st.markdown(f"""
         <div class="q-box no-select">
-            <div class="q-num">SOAL {step + 1} &nbsp;/&nbsp; {soal.get('kategori', 'Kecerdasan')}</div>
-            <div class="q-text">{soal.get('pertanyaan', '—')}</div>
+            <div class="q-num">SOAL {step+1} &nbsp;/&nbsp; {soal.get('kategori','Kecerdasan')}</div>
+            <div class="q-text">{soal.get('pertanyaan','—')}</div>
         </div>
     """, unsafe_allow_html=True)
 
-    opsi = soal.get("opsi", [])
-    current = st.session_state.sim_jawaban[step]
-    idx = opsi.index(current) if current in opsi else None
+    opsi    = soal.get("opsi", [])
+    current = st.session_state.mar_jawaban["Kecerdasan"][step]
+    idx     = opsi.index(current) if current in opsi else None
 
     with st.form(key=f"form_kec_{step}"):
         pilihan = st.radio("Pilih jawaban:", opsi, index=idx, label_visibility="collapsed")
         if st.form_submit_button("SIMPAN JAWABAN", use_container_width=True):
-            st.session_state.sim_jawaban[step] = pilihan
+            st.session_state.mar_jawaban["Kecerdasan"][step] = pilihan
             st.rerun()
 
     _nav_buttons(step, "Kecerdasan")
 
 
-# ── KECERMATAN (auto-submit, tanpa navigasi, tanpa tanda tanya) ──
-def _render_kecermatan(soal: dict, step: int):
-    kunci_html = "".join(f'<div class="kunci-char">{c}</div>' for c in soal.get("kunci", []))
-    kolom_nama = soal.get("nama_kolom", "KUNCI")
-
-    # Tampilan: hanya 4 karakter, tanpa "?" — user harus tahu sendiri mana yang hilang
-    st.markdown(f"""
-        <div class="q-box no-select">
-            <div class="q-num">SOAL {step + 1} &nbsp;/&nbsp; {kolom_nama}</div>
-            <div style="margin-bottom:12px;">
-                <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-sec);letter-spacing:1px;margin-bottom:8px;">KUNCI REFERENSI</div>
-                <div class="kunci-grid">{kunci_html}</div>
-            </div>
-            <div class="q-text">Karakter apa yang <b style="color:var(--red-alert);">tidak ada</b> di tampilan ini?</div>
-            <div class="tampilan-box">{soal.get('tampilan', '')}</div>
-            <div class="missing-hint">Bandingkan dengan kunci referensi di atas — pilih karakter yang hilang.</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Auto-submit: klik = langsung simpan + lanjut soal
-    opsi = soal.get("opsi", [])
-    cols = st.columns(len(opsi))
-    for i, op in enumerate(opsi):
-        with cols[i]:
-            if st.button(str(op), key=f"cer_opt_{step}_{i}", use_container_width=True):
-                waktu = catat_waktu_jawab(soal)
-                st.session_state.sim_jawaban[step]      = op
-                st.session_state.sim_waktu_soal[step]   = waktu
-                st.session_state.sim_waktu_kecermatan.append(waktu)
-
-                if step >= SOAL_TOTAL - 1:
-                    skor = _hitung_skor_akhir("Kecermatan")
-                    save_score(st.session_state.get("username", "guest"), "Kecermatan", skor)
-                    st.session_state.sim_done = True
-                else:
-                    st.session_state.sim_step += 1
-                st.rerun()
-
-
-# ── KEPRIBADIAN (Likert 5 Skala Statis) ──
+# ── KEPRIBADIAN ──
 def _render_kepribadian(soal: dict, step: int):
-    arah = soal.get("arah", "positif")
+    arah       = soal.get("arah", "positif")
     arah_label = "Pernyataan Positif" if arah == "positif" else "Pernyataan Negatif"
-    arah_css   = "positif" if arah == "positif" else "negatif"
+    arah_css   = arah
 
     st.markdown(f"""
         <div class="q-box no-select">
-            <div class="q-num">PERNYATAAN {step + 1} &nbsp;/&nbsp; KEPRIBADIAN</div>
-            <div class="q-text">{soal.get('pernyataan', '—')}</div>
+            <div class="q-num">PERNYATAAN {step+1} &nbsp;/&nbsp; KEPRIBADIAN</div>
+            <div class="q-text">{soal.get('pernyataan','—')}</div>
             <div><span class="arah-badge {arah_css}">{arah_label}</span></div>
         </div>
     """, unsafe_allow_html=True)
 
-    # Opsi Likert statis A-E
-    current = st.session_state.sim_jawaban[step]
-    # Ekstrak huruf dari jawaban tersimpan jika ada
-    current_huruf = current[0] if current and len(current) > 0 else None
-
-    # Render sebagai radio Streamlit dengan label custom
     likert_labels = [
-        "A. Sangat Setuju",
-        "B. Setuju",
-        "C. Ragu-ragu",
-        "D. Tidak Setuju",
-        "E. Sangat Tidak Setuju",
+        "A. Sangat Setuju", "B. Setuju", "C. Ragu-ragu",
+        "D. Tidak Setuju",  "E. Sangat Tidak Setuju",
     ]
+    current = st.session_state.mar_jawaban["Kepribadian"][step]
+    # current bisa berupa huruf saja (A) atau label penuh — normalkan ke label penuh
+    if current and len(current) == 1:
+        label_match = [l for l in likert_labels if l.startswith(current.upper() + ".")]
+        current = label_match[0] if label_match else None
     idx = likert_labels.index(current) if current in likert_labels else None
 
     with st.form(key=f"form_kep_{step}"):
         st.markdown('<div class="likert-label">Pilih Respons Anda:</div>', unsafe_allow_html=True)
-        pilihan = st.radio(
-            "Respons:",
-            likert_labels,
-            index=idx,
-            label_visibility="collapsed",
-        )
+        pilihan = st.radio("Respons:", likert_labels, index=idx, label_visibility="collapsed")
         if st.form_submit_button("SIMPAN JAWABAN", use_container_width=True):
-            # Simpan huruf awal (A/B/C/D/E) untuk scoring
-            st.session_state.sim_jawaban[step] = pilihan[0]  # cukup huruf
+            # Simpan huruf saja (A/B/C/D/E) untuk efisiensi scoring
+            st.session_state.mar_jawaban["Kepribadian"][step] = pilihan[0]
             st.rerun()
 
     _nav_buttons(step, "Kepribadian")
 
 
-# ══════════════════════════════════════════════
-# RESULT SCREEN
-# ══════════════════════════════════════════════
-def _show_result(sesi: str):
-    skor = _hitung_skor_akhir(sesi)
-
-    if sesi == "Pass Hand":
-        ya_count    = sum(1 for j in st.session_state.sim_jawaban if j == "YA")
-        tidak_count = sum(1 for j in st.session_state.sim_jawaban if j == "TIDAK")
-        skip_count  = sum(1 for j in st.session_state.sim_jawaban if j is None)
-        skor_display = ya_count
-        unit = "PERNYATAAN YA"
-        max_ref = SOAL_TOTAL
-        verdict = "✅ PROFIL TERJAWAB — Analisis kepribadian tersimpan."
-        extra_html = f"""
-            <div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);margin-top:14px;">
-                {ya_count} YA &nbsp;/&nbsp; {tidak_count} TIDAK &nbsp;/&nbsp; {skip_count} Skip
-            </div>"""
-
-    elif sesi == "Kecerdasan":
-        skor_display = skor
-        unit = "PTS"
-        max_ref = SOAL_TOTAL * 5
-        if skor >= max_ref * 0.8:   verdict = "🏆 EXCELLENT — Performa sangat tinggi"
-        elif skor >= max_ref * 0.6: verdict = "✅ BAIK — Di atas rata-rata"
-        else:                        verdict = "📈 PERLU LATIHAN LEBIH"
-        benar = skor // 5
-        extra_html = f'<div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);margin-top:10px;">{benar} benar &nbsp;/&nbsp; {SOAL_TOTAL - benar} salah/skip</div>'
-
-    elif sesi == "Kecermatan":
-        skor_display = skor
-        unit = "BENAR"
-        max_ref = SOAL_TOTAL
-        ketahanan_data = hitung_ketahanan([w for w in st.session_state.get("sim_waktu_kecermatan", []) if w])
-        if skor >= max_ref * 0.8:   verdict = "🏆 CERMAT & CEPAT"
-        elif skor >= max_ref * 0.6: verdict = "✅ CUKUP BAIK"
-        else:                        verdict = "📈 TINGKATKAN KETELITIAN"
-        extra_html = f"""
-            <div style="margin-top:14px;background:var(--bg-elevated);border-radius:6px;padding:12px 16px;display:inline-block;">
-                <span style="font-family:var(--mono);font-size:0.68rem;color:var(--accent);">KETAHANAN</span>
-                <div style="font-family:var(--display);font-size:1.9rem;font-weight:900;color:var(--text-pri);">
-                    {ketahanan_data['skor_ketahanan']}<span style="font-size:0.9rem;color:var(--text-sec);">/100</span>
-                </div>
-                <div style="font-size:0.73rem;color:var(--text-sec);">{ketahanan_data['kategori']}</div>
-            </div>"""
-
-    else:  # Kepribadian Likert
-        skor_display = skor
-        unit = "PTS"
-        max_ref = SOAL_TOTAL * 5
-        rata = round(skor / max(SOAL_TOTAL, 1), 2)
-        if rata >= 4.0:   verdict = "🏆 PROFIL SANGAT SESUAI"
-        elif rata >= 3.0: verdict = "✅ PROFIL BAIK"
-        else:              verdict = "📊 PERLU EVALUASI DIRI"
-        extra_html = f'<div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);margin-top:10px;">Rata-rata Likert: {rata} / 5.0</div>'
-
-    pct = min(int(float(skor_display) / max(max_ref, 1) * 100), 100)
+# ── KECERMATAN (auto-submit, no navigasi) ──
+def _render_kecermatan(soal: dict, step: int):
+    kunci_html = "".join(f'<div class="kunci-char">{c}</div>' for c in soal.get("kunci", []))
+    kolom_nama = soal.get("nama_kolom", "KUNCI")
 
     st.markdown(f"""
-        <div class="result-box">
-            <div class="result-label">[ SESI {sesi.upper()} — SELESAI ]</div>
-            <div class="result-score">{skor_display}</div>
-            <div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);">{unit}</div>
-            <div class="result-bar-wrap"><div class="result-bar-fill" style="width:{pct}%;"></div></div>
-            <div class="result-verdict">{verdict}</div>
-            {extra_html}
+        <div class="q-box no-select">
+            <div class="q-num">SOAL {step+1} &nbsp;/&nbsp; {kolom_nama}</div>
+            <div style="margin-bottom:12px;">
+                <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-sec);letter-spacing:1px;margin-bottom:8px;">
+                    KUNCI REFERENSI
+                </div>
+                <div class="kunci-grid">{kunci_html}</div>
+            </div>
+            <div class="q-text">Karakter apa yang <b style="color:var(--red-alert);">tidak ada</b> di baris berikut?</div>
+            <div class="tampilan-box">{soal.get('tampilan','')}</div>
+            <div class="missing-hint">Bandingkan dengan kunci referensi di atas — pilih karakter yang hilang.</div>
         </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔄 ULANGI SESI INI", use_container_width=True):
-            _init_sesi(sesi)
+    opsi = soal.get("opsi", [])
+    cols = st.columns(len(opsi))
+    for i, op in enumerate(opsi):
+        with cols[i]:
+            if st.button(str(op), key=f"cer_{step}_{i}", use_container_width=True):
+                waktu = catat_waktu_jawab(soal)
+                st.session_state.mar_jawaban["Kecermatan"][step]   = op
+                st.session_state.mar_waktu_soal["Kecermatan"][step] = waktu
+                st.session_state.mar_waktu_kecermatan.append(waktu)
+
+                if step >= SOAL_PER_SESI - 1:
+                    _selesai_sesi()
+                else:
+                    st.session_state.mar_step += 1
+                st.rerun()
+
+
+# ══════════════════════════════════════════════
+# HASIL AKHIR MARATON
+# ══════════════════════════════════════════════
+def _show_hasil_akhir():
+    rekap = st.session_state.get("mar_rekap", {})
+    rata  = rekap.get("rata_rata", 0)
+    lulus = rekap.get("lulus", False)
+    pg    = rekap.get("passing_grade", PASSING_GRADE)
+
+    status_cls  = "final-status-ms"  if lulus else "final-status-tms"
+    status_txt  = "✅ MS — MEMENUHI SYARAT" if lulus else "❌ TMS — TIDAK MEMENUHI SYARAT"
+    bar_cls     = "final-bar-fill-ms" if lulus else "final-bar-fill-tms"
+    pct         = min(int(rata / 100 * 100), 100)
+    verdict_txt = "Selamat! Performa Anda di atas passing grade." if lulus else f"Rata-rata {rata} belum mencapai passing grade {pg}. Tetap semangat!"
+
+    st.markdown(f"""
+        <div class="final-box">
+            <div class="final-label">[ MARATON SELESAI — HASIL AKHIR ]</div>
+            <div class="final-score">{rata}</div>
+            <div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);">RATA-RATA / 100</div>
+            <div class="final-bar-wrap"><div class="{bar_cls}" style="width:{pct}%;"></div></div>
+            <div style="margin-top:14px;"><span class="{status_cls}">{status_txt}</span></div>
+            <div style="font-size:0.88rem;color:var(--text-sec);margin-top:8px;">{verdict_txt}</div>
+            <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-dim);margin-top:6px;">
+                Passing Grade: {pg} &nbsp;|&nbsp; Skor ini telah disimpan ke Leaderboard
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # ── Skor per sesi ──
+    st.markdown("""
+        <div class="sec-head"><div class="sec-head-line"></div>
+        <div class="sec-head-text">Skor Per Sesi</div></div>
+    """, unsafe_allow_html=True)
+
+    skor_cards = ""
+    for sesi in URUTAN_MARATON:
+        cfg_s = SESI_CONFIG[sesi]
+        hasil_s = st.session_state.mar_hasil.get(sesi, {})
+        s100  = hasil_s.get("skor_100", 0)
+        s_pct = min(s100, 100)
+        skor_cards += f"""
+        <div class="skor-card">
+            <span class="sk-label">{cfg_s['icon']} {cfg_s['label']}</span>
+            <span class="sk-val">{s100}</span>
+            <div class="sk-bar-wrap"><div class="sk-bar-fill" style="width:{s_pct}%;background:{cfg_s['color']};"></div></div>
+        </div>"""
+    st.markdown(f'<div class="skor-grid">{skor_cards}</div>', unsafe_allow_html=True)
+
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🔄 ULANG MARATON", use_container_width=True):
+            _init_maraton()
+            st.session_state.page = "simulasi"
             st.rerun()
-    with col2:
-        if st.button("🏠 KEMBALI KE HOME", use_container_width=True):
+    with c2:
+        if st.button("🏠 KEMBALI HOME", use_container_width=True):
             st.session_state.page = "home"
             st.rerun()
+
+    # ── EVALUASI / PEMBAHASAN ──
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="sec-head"><div class="sec-head-line"></div>
+        <div class="sec-head-text">📖 Evaluasi & Pembahasan</div></div>
+        <div style="font-size:0.83rem;color:var(--text-sec);margin-bottom:16px;">
+            Review soal yang jawabannya belum optimal. Pelajari pembahasannya untuk performa lebih baik di sesi berikutnya.
+        </div>
+    """, unsafe_allow_html=True)
+
+    tab_labels = [f"{SESI_CONFIG[s]['icon']} {s}" for s in URUTAN_MARATON]
+    tabs = st.tabs(tab_labels)
+
+    for tab, sesi in zip(tabs, URUTAN_MARATON):
+        with tab:
+            hasil_s = st.session_state.mar_hasil.get(sesi, {})
+            detail  = hasil_s.get("detail", [])
+            _render_evaluasi(sesi, detail)
+
+
+def _render_evaluasi(sesi: str, detail: list):
+    if not detail:
+        st.markdown('<div style="color:var(--text-dim);font-size:0.85rem;padding:16px 0;">Tidak ada data evaluasi.</div>', unsafe_allow_html=True)
+        return
+
+    salah_count = sum(1 for d in detail if not d.get("benar", True))
+    benar_count = len(detail) - salah_count
+    st.markdown(f"""
+        <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;">
+            <div style="font-family:var(--mono);font-size:0.72rem;color:#39d353;">✓ Benar: {benar_count}</div>
+            <div style="font-family:var(--mono);font-size:0.72rem;color:#f85149;">✗ Salah/Sub-optimal: {salah_count}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    for i, d in enumerate(detail, 1):
+        is_benar = d.get("benar", True)
+        css_cls  = "benar" if is_benar else "salah"
+        icon     = "✓" if is_benar else "✗"
+
+        if sesi == "Pass Hand":
+            q_html = f"<b>{i}.</b> {d.get('pernyataan','')}"
+            ans_html = (
+                f'<span class="user-ans">Jawaban Lo: {d.get("jawaban_user","—")}</span>'
+                f'<span class="correct-ans">Ideal: {d.get("jawaban_ideal","—")}</span>'
+            )
+
+        elif sesi == "Kecerdasan":
+            q_html   = f"<b>{i}.</b> {d.get('pertanyaan','')}"
+            ans_html = (
+                f'<span class="user-ans">Lo: {d.get("teks_user","—")}</span>'
+                f'<span class="correct-ans">Benar: {d.get("teks_benar","—")}</span>'
+            )
+
+        elif sesi == "Kepribadian":
+            label_map = {"A": "Sangat Setuju", "B": "Setuju", "C": "Ragu-ragu",
+                         "D": "Tidak Setuju",  "E": "Sangat Tidak Setuju"}
+            jwb_huruf = d.get("jawaban_user", "C")
+            q_html    = f"<b>{i}.</b> {d.get('pernyataan','')}"
+            ans_html  = (
+                f'<span class="user-ans">Lo: {label_map.get(jwb_huruf, jwb_huruf)} '
+                f'(+{d.get("poin",0)} poin)</span>'
+                f'<span class="correct-ans">Arah: {d.get("arah","").upper()}</span>'
+            )
+
+        else:  # Kecermatan
+            q_html   = f"<b>{i}.</b> Kunci <b>{d.get('nama_kolom','')}</b>: tampilan <code>{d.get('tampilan','')}</code>"
+            ans_html = (
+                f'<span class="user-ans">Lo: {d.get("jawaban_user","—")}</span>'
+                f'<span class="correct-ans">Benar: {d.get("jawaban_benar","—")}</span>'
+            )
+
+        pembahasan = d.get("pembahasan", "")
+        st.markdown(f"""
+            <div class="eval-item {css_cls}">
+                <div style="font-family:var(--mono);font-size:0.6rem;color:{'#39d353' if is_benar else '#f85149'};letter-spacing:1px;margin-bottom:6px;">
+                    {icon} SOAL {i}
+                </div>
+                <div class="eval-q">{q_html}</div>
+                <div class="eval-ans">{ans_html}</div>
+                {'<div class="eval-pembahasan">💡 ' + pembahasan + '</div>' if pembahasan else ''}
+            </div>
+        """, unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════
@@ -984,7 +1023,7 @@ def main():
     with st.sidebar:
         st.markdown("""
             <div style="text-align:center;padding:20px 0 14px;">
-                <div style="font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#fb6b00;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px;">[ SISTEM AKTIF ]</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#fb6b00;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px;">[ MARATON v4.0 ]</div>
                 <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.45rem;font-weight:900;color:#e6edf3;letter-spacing:-0.5px;">PSYCHOTECH</div>
             </div>
         """, unsafe_allow_html=True)
@@ -994,15 +1033,11 @@ def main():
             st.session_state.page = "home"
             st.rerun()
 
-        st.markdown("<div style='height:5px'></div>", unsafe_allow_html=True)
-        st.markdown("<div style='font-family:JetBrains Mono;font-size:0.58rem;color:#484f58;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;'>MULAI SESI</div>", unsafe_allow_html=True)
-
-        for sesi_key in ["Pass Hand", "Kecerdasan", "Kecermatan", "Kepribadian"]:
-            cfg = SESI_CONFIG[sesi_key]
-            if st.button(f"{cfg['icon']}  {cfg['label']}", use_container_width=True, key=f"nav_{sesi_key}"):
-                _init_sesi(sesi_key)
-                st.session_state.page = "simulasi"
-                st.rerun()
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        if st.button("🚀  MULAI MARATON", use_container_width=True, key="nav_maraton"):
+            _init_maraton()
+            st.session_state.page = "simulasi"
+            st.rerun()
 
         st.divider()
         st.markdown(f"<div style='font-size:0.76rem;color:#7d8590;'>👤 <b style='color:#e6edf3;'>{st.session_state.get('username','—')}</b></div>", unsafe_allow_html=True)
