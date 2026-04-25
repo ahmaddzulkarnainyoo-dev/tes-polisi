@@ -1,11 +1,11 @@
 """
-app.py — Psychotech Polri | Arena CAT v3.0
-- Pass Hand: YA/TIDAK profiling (10 pernyataan)
-- Kecerdasan/Kepribadian/Pass Hand: tombol Sebelumnya & Selanjutnya
-- Jawaban tersimpan di session_state, bisa di-review
-- Kecermatan: auto-submit saat klik pilihan
-- Timer stabil berbasis start_time (tidak reset saat navigasi)
-- Home: Leaderboard Top 5 dari Supabase, tanpa fitur berita
+app.py — Psychotech Polri | Arena CAT v3.1
+Changelog:
+- Kepribadian: Likert 5 skala statis (A-E), skor berdasar arah pernyataan
+- Kecermatan: Hilangkan tanda tanya dari tampilan soal
+- Anti-copas: CSS user-select disabled + watermark username transparan
+- Leaderboard: display_leaderboard() dengan filter dan styling kompetitif
+- Navigasi: Sebelumnya/Selanjutnya di semua sesi kecuali Kecermatan (auto-submit)
 """
 
 import streamlit as st
@@ -22,6 +22,7 @@ from engine import (
     nilai_jawaban_kepribadian,
     nilai_jawaban_kecermatan,
     posisi_target_acak,
+    LIKERT_OPSI,
 )
 from database import supabase
 
@@ -90,6 +91,46 @@ html, body, [class*="css"] {
     z-index: 9999;
 }
 
+/* ── Anti-Copas: disable text selection di area simulasi ── */
+.no-select, .q-box, .pernyataan-box, .kunci-grid, .tampilan-box, .q-text {
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+}
+
+/* ── Watermark username transparan ── */
+.sim-watermark {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1000;
+    overflow: hidden;
+}
+.sim-watermark-text {
+    font-family: var(--display);
+    font-size: 4.5rem;
+    font-weight: 900;
+    color: rgba(251, 107, 0, 0.045);
+    text-transform: uppercase;
+    letter-spacing: 6px;
+    transform: rotate(-30deg);
+    white-space: nowrap;
+    text-shadow: none;
+    line-height: 1.2;
+    text-align: center;
+}
+.sim-watermark-text span {
+    display: block;
+    font-size: 2rem;
+    letter-spacing: 10px;
+    color: rgba(255, 255, 255, 0.025);
+    margin-top: 6px;
+}
+
 /* ── Panels ── */
 .panel { background: var(--bg-panel); border: 1px solid var(--border-dim); border-radius: var(--r-lg); padding: 28px; margin-bottom: 20px; }
 .panel-elevated { background: var(--bg-surface); border: 1px solid var(--border-dim); border-radius: var(--r-md); padding: 20px; }
@@ -145,6 +186,10 @@ html, body, [class*="css"] {
 .lb-rank.r1 { color: var(--gold); } .lb-rank.r2 { color: #c0c0c0; } .lb-rank.r3 { color: #cd7f32; } .lb-rank.rx { color: var(--text-dim); }
 .lb-score { font-family: var(--display); font-size: 1.1rem; font-weight: 800; color: var(--accent); }
 .lb-sesi { font-family: var(--mono); font-size: 0.68rem; color: var(--text-sec); background: var(--bg-elevated); border-radius: 3px; padding: 2px 6px; }
+/* New: podium highlight untuk top 3 */
+.lb-row-1 td { background: rgba(227,179,65,0.05) !important; }
+.lb-row-2 td { background: rgba(192,192,192,0.04) !important; }
+.lb-row-3 td { background: rgba(205,127,50,0.04) !important; }
 
 /* ── Sim Header ── */
 .sim-hdr { background: var(--bg-panel); border: 1px solid var(--border-dim); border-top: 2px solid var(--accent); border-radius: var(--r-md); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
@@ -160,11 +205,22 @@ html, body, [class*="css"] {
 .q-num { font-family: var(--mono); font-size: 0.63rem; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
 .q-text { font-size: 1rem; color: var(--text-pri); line-height: 1.7; font-weight: 400; }
 
+/* ── Likert Scale ── */
+.likert-label { font-family: var(--mono); font-size: 0.62rem; color: var(--text-sec); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+.likert-scale { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.likert-opt { flex: 1; min-width: 100px; background: var(--bg-elevated); border: 1px solid var(--border-dim); border-radius: var(--r-sm); padding: 10px 8px; text-align: center; cursor: pointer; transition: all 0.15s; }
+.likert-opt:hover { border-color: var(--border-glow); background: var(--bg-surface); }
+.likert-opt .lo-huruf { font-family: var(--display); font-size: 1.1rem; font-weight: 800; color: var(--accent); display: block; }
+.likert-opt .lo-label { font-size: 0.7rem; color: var(--text-sec); display: block; margin-top: 3px; line-height: 1.3; }
+.arah-badge { display: inline-block; font-family: var(--mono); font-size: 0.6rem; letter-spacing: 1px; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; margin-top: 8px; }
+.arah-badge.positif { background: rgba(57,211,83,0.12); border: 1px solid rgba(57,211,83,0.3); color: #39d353; }
+.arah-badge.negatif { background: rgba(248,81,73,0.12); border: 1px solid rgba(248,81,73,0.3); color: #f85149; }
+
 /* ── Kecermatan ── */
 .kunci-grid { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
 .kunci-char { background: var(--bg-elevated); border: 1px solid var(--accent); border-radius: var(--r-sm); padding: 9px 14px; font-family: var(--mono); font-size: 1.05rem; font-weight: 700; color: var(--accent); min-width: 42px; text-align: center; }
 .tampilan-box { font-family: var(--mono); font-size: 1.3rem; letter-spacing: 7px; color: var(--text-pri); background: var(--bg-elevated); border: 1px solid var(--border-dim); border-radius: var(--r-sm); padding: 12px 18px; display: inline-block; margin: 10px 0; }
-.tampilan-box .missing { color: var(--red-alert); font-size: 1.5rem; }
+.missing-hint { font-family: var(--mono); font-size: 0.68rem; color: var(--text-sec); margin-top: 6px; }
 
 /* ── Pass Hand YA/TIDAK ── */
 .pernyataan-box { background: var(--bg-surface); border: 1px solid var(--border-dim); border-left: 3px solid var(--accent); border-radius: var(--r-md); padding: 24px 22px; margin-bottom: 18px; font-size: 1.05rem; color: var(--text-pri); line-height: 1.7; }
@@ -205,12 +261,6 @@ html, body, [class*="css"] {
     transition: all 0.15s ease !important; width: 100%;
 }
 .stButton > button:hover { background: var(--accent-ember) !important; transform: translateY(-1px) !important; box-shadow: 0 6px 18px rgba(251,107,0,0.35) !important; }
-/* Secondary buttons */
-button[kind="secondary"], .stButton > button.secondary {
-    background: var(--bg-elevated) !important; color: var(--text-sec) !important;
-    border: 1px solid var(--border-dim) !important;
-}
-button[kind="secondary"]:hover { background: var(--bg-surface) !important; color: var(--text-pri) !important; }
 .stTextInput > div > div > input { background: var(--bg-elevated) !important; border: 1px solid var(--border-dim) !important; border-radius: var(--r-sm) !important; color: var(--text-pri) !important; font-family: var(--body) !important; font-size: 0.88rem !important; padding: 9px 13px !important; }
 .stTextInput > div > div > input:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 2px var(--accent-dim) !important; }
 .stTextInput > label, .stSelectbox > label, .stRadio > label { color: var(--text-sec) !important; font-size: 0.78rem !important; font-family: var(--mono) !important; letter-spacing: 1px !important; text-transform: uppercase !important; }
@@ -235,6 +285,8 @@ div[data-testid="stProgress"] > div > div { background: var(--accent) !important
     .kunci-char { min-width: 36px; padding: 7px 9px; font-size: 0.9rem; }
     .result-score { font-size: 3.8rem; }
     .hero-command { padding: 28px 20px 24px; }
+    .likert-scale { flex-direction: column; }
+    .likert-opt { min-width: unset; }
 }
 
 /* ── Footer ── */
@@ -304,12 +356,95 @@ def get_leaderboard(sesi: str = "Semua", limit: int = 5) -> list:
 
 
 # ══════════════════════════════════════════════
+# LEADERBOARD COMPONENT
+# ══════════════════════════════════════════════
+def display_leaderboard(filter_key: str = "lb_filter_home"):
+    """
+    Komponen leaderboard lengkap: filter sesi + tabel Top 5 + skor user sendiri.
+    Bisa dipanggil dari halaman mana pun.
+    """
+    filter_sesi = st.selectbox(
+        "Filter Sesi:",
+        ["Semua", "Pass Hand", "Kecerdasan", "Kecermatan", "Kepribadian"],
+        label_visibility="collapsed",
+        key=filter_key,
+    )
+    rows = get_leaderboard(filter_sesi, limit=5)
+
+    medal_map = {1: ("🥇", "r1"), 2: ("🥈", "r2"), 3: ("🥉", "r3")}
+    rows_html = ""
+    for i, row in enumerate(rows, 1):
+        medal, cls = medal_map.get(i, ("", "rx"))
+        uname = row.get("username", "—")
+        skor  = row.get("skor", 0)
+        sesi  = row.get("sesi", "—")
+        row_cls = f"lb-row-{i}" if i <= 3 else ""
+        rows_html += f"""
+        <tr class="{row_cls}">
+            <td><span class="lb-rank {cls}">{medal or f'#{i}'}</span></td>
+            <td style="font-weight:600;">{uname}</td>
+            <td><span class="lb-sesi">{sesi}</span></td>
+            <td><span class="lb-score">{skor}</span></td>
+        </tr>"""
+
+    if not rows_html:
+        rows_html = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:24px 0;">Belum ada data</td></tr>'
+
+    st.markdown(f"""
+        <div class="panel" style="padding:18px;">
+            <table class="lb-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Username</th>
+                        <th>Sesi</th>
+                        <th>Skor</th>
+                    </tr>
+                </thead>
+                <tbody>{rows_html}</tbody>
+            </table>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Skor terbaik user sendiri
+    my_scores = []
+    try:
+        res = supabase.table("scores").select("sesi, skor")\
+            .eq("username", st.session_state.get("username", ""))\
+            .order("skor", desc=True).limit(4).execute()
+        my_scores = res.data or []
+    except Exception:
+        pass
+
+    if my_scores:
+        st.markdown("""
+            <div class="sec-head" style="margin-top:18px;">
+                <div class="sec-head-line"></div>
+                <div class="sec-head-text">Skor Terbaik Lo</div>
+            </div>
+        """, unsafe_allow_html=True)
+        my_rows = "".join(
+            f'<tr><td><span class="lb-sesi">{s["sesi"]}</span></td>'
+            f'<td><span class="lb-score">{s["skor"]}</span></td></tr>'
+            for s in my_scores
+        )
+        st.markdown(f"""
+            <div class="panel" style="padding:14px 18px;">
+                <table class="lb-table">
+                    <thead><tr><th>Sesi</th><th>Best</th></tr></thead>
+                    <tbody>{my_rows}</tbody>
+                </table>
+            </div>
+        """, unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════
 # AUTH PAGE
 # ══════════════════════════════════════════════
 def show_auth():
     st.markdown("""
         <div class="auth-logo">
-            <span class="badge">[ CAT SYSTEM v3.0 ]</span>
+            <span class="badge">[ CAT SYSTEM v3.1 ]</span>
             <div class="name">PSYCHO<span>TECH</span></div>
             <div class="sub">Platform Simulasi CAT Psikotes Polri</div>
         </div>
@@ -397,8 +532,8 @@ def show_home():
         sesi_data = [
             {"key": "Pass Hand",   "icon": "📋", "title": "PASS HAND",   "desc": "10 pernyataan YA/TIDAK untuk mengukur profil kepribadian polisi. Tidak ada benar/salah — hanya kejujuran.", "tags": ["10 Pernyataan", "Profiling", "45 Detik/Soal"], "accent": "#fb6b00"},
             {"key": "Kecerdasan",  "icon": "🧠", "title": "KECERDASAN",  "desc": "Logika, numerik, verbal, spasial & mata angin. AI + template lokal. Benar +5, Salah 0.", "tags": ["10 Soal", "+5 per Benar", "AI + Lokal"], "accent": "#39d353"},
-            {"key": "Kecermatan",  "icon": "🎯", "title": "KECERMATAN",  "desc": "Temukan karakter hilang dari kunci 5 kolom (sesuai format 2025). Klik = langsung submit. Ukur ketahanan.", "tags": ["10 Soal", "Auto-Submit", "Ketahanan"], "accent": "#58a6ff"},
-            {"key": "Kepribadian", "icon": "🧬", "title": "KEPRIBADIAN", "desc": "Profil psikologi dari respons situasional polisi. Navigasi maju-mundur. Skor bobot unik.", "tags": ["10 Soal", "Skor 1–5", "Navigasi"], "accent": "#bc8cff"},
+            {"key": "Kecermatan",  "icon": "🎯", "title": "KECERMATAN",  "desc": "Temukan karakter hilang dari kunci 5 kolom (format 2025). Klik = langsung submit. Ukur ketahanan.", "tags": ["10 Soal", "Auto-Submit", "Ketahanan"], "accent": "#58a6ff"},
+            {"key": "Kepribadian", "icon": "🧬", "title": "KEPRIBADIAN", "desc": "Skala Likert 5 tingkat (Sangat Setuju — Sangat Tidak Setuju). Skor adaptif arah pernyataan.", "tags": ["10 Soal", "Likert 1–5", "Navigasi"], "accent": "#bc8cff"},
         ]
 
         st.markdown('<div class="arena-grid">', unsafe_allow_html=True)
@@ -433,70 +568,7 @@ def show_home():
         st.markdown("""
             <div class="sec-head"><div class="sec-head-line"></div><div class="sec-head-text">🏆 Leaderboard Top 5</div></div>
         """, unsafe_allow_html=True)
-
-        filter_sesi = st.selectbox(
-            "Filter:",
-            ["Semua", "Pass Hand", "Kecerdasan", "Kecermatan", "Kepribadian"],
-            label_visibility="collapsed", key="lb_filter"
-        )
-        rows = get_leaderboard(filter_sesi, limit=5)
-
-        medal_map = {1: ("🥇", "r1"), 2: ("🥈", "r2"), 3: ("🥉", "r3")}
-        rows_html = ""
-        for i, row in enumerate(rows, 1):
-            medal, cls = medal_map.get(i, ("", "rx"))
-            uname = row.get("username", "—")
-            skor  = row.get("skor", 0)
-            sesi  = row.get("sesi", "—")
-            rows_html += f"""
-            <tr>
-                <td><span class="lb-rank {cls}">{medal or f'#{i}'}</span></td>
-                <td style="font-weight:600;">{uname}</td>
-                <td><span class="lb-sesi">{sesi}</span></td>
-                <td><span class="lb-score">{skor}</span></td>
-            </tr>"""
-
-        if not rows_html:
-            rows_html = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:24px 0;">Belum ada data</td></tr>'
-
-        st.markdown(f"""
-            <div class="panel" style="padding:18px;">
-                <table class="lb-table">
-                    <thead><tr><th>#</th><th>Username</th><th>Sesi</th><th>Skor</th></tr></thead>
-                    <tbody>{rows_html}</tbody>
-                </table>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Skor terbaik user sendiri
-        my_scores = []
-        try:
-            res = supabase.table("scores").select("sesi, skor")\
-                .eq("username", st.session_state.get("username", ""))\
-                .order("skor", desc=True).limit(4).execute()
-            my_scores = res.data or []
-        except Exception:
-            pass
-
-        if my_scores:
-            st.markdown("""
-                <div class="sec-head" style="margin-top:18px;">
-                    <div class="sec-head-line"></div>
-                    <div class="sec-head-text">Skor Terbaik Lo</div>
-                </div>
-            """, unsafe_allow_html=True)
-            my_rows = "".join(
-                f'<tr><td><span class="lb-sesi">{s["sesi"]}</span></td><td><span class="lb-score">{s["skor"]}</span></td></tr>'
-                for s in my_scores
-            )
-            st.markdown(f"""
-                <div class="panel" style="padding:14px 18px;">
-                    <table class="lb-table">
-                        <thead><tr><th>Sesi</th><th>Best</th></tr></thead>
-                        <tbody>{my_rows}</tbody>
-                    </table>
-                </div>
-            """, unsafe_allow_html=True)
+        display_leaderboard(filter_key="lb_filter_home")
 
     st.markdown("""
         <div class="footer-credit">
@@ -523,23 +595,20 @@ def _gen_soal(sesi: str) -> dict:
 def _init_sesi(sesi: str):
     cfg = SESI_CONFIG[sesi]
     st.session_state.sim_sesi    = sesi
-    st.session_state.sim_step    = 0          # index 0..SOAL_TOTAL-1
+    st.session_state.sim_step    = 0
     st.session_state.sim_done    = False
     st.session_state.sim_waktu_kecermatan = []
 
-    # Pre-generate semua soal sekaligus (hemat round-trip, navigasi lancar)
     soal_list = [_gen_soal(sesi) for _ in range(SOAL_TOTAL)]
     st.session_state.sim_soal_list  = soal_list
-    st.session_state.sim_jawaban    = [None] * SOAL_TOTAL  # simpan jawaban user
-    st.session_state.sim_waktu_soal = [None] * SOAL_TOTAL  # waktu jawab per soal (kecermatan)
+    st.session_state.sim_jawaban    = [None] * SOAL_TOTAL
+    st.session_state.sim_waktu_soal = [None] * SOAL_TOTAL
 
-    # Timer global sesi (satu timer untuk seluruh sesi)
     st.session_state.sim_start_time = time.time()
-    st.session_state.sim_durasi     = cfg["timer"] * SOAL_TOTAL  # total waktu semua soal
+    st.session_state.sim_durasi     = cfg["timer"] * SOAL_TOTAL
 
 
 def _hitung_skor_akhir(sesi: str) -> int:
-    """Hitung skor total dari semua jawaban tersimpan."""
     soal_list = st.session_state.sim_soal_list
     jawaban   = st.session_state.sim_jawaban
     total = 0
@@ -550,11 +619,13 @@ def _hitung_skor_akhir(sesi: str) -> int:
             huruf = str(jwb).split(".")[0].strip()
             total += nilai_jawaban_kecerdasan(huruf, soal.get("jawaban", "A"))
         elif sesi == "Kepribadian":
-            huruf = str(jwb).split(".")[0].strip()
-            total += nilai_jawaban_kepribadian(huruf, soal.get("skor", {}))
+            # jwb berisi huruf A/B/C/D/E
+            huruf = str(jwb).strip().upper()[0]
+            arah  = soal.get("arah", "positif")
+            total += nilai_jawaban_kepribadian(huruf, arah)
         elif sesi == "Kecermatan":
             total += nilai_jawaban_kecermatan(str(jwb).strip(), soal.get("jawaban", ""))
-        # Pass Hand: skor 0, tidak ada penambahan
+        # Pass Hand: tidak ada skor numerik
     return total
 
 
@@ -570,17 +641,27 @@ def show_simulation():
         _show_result(sesi)
         return
 
-    step       = st.session_state.sim_step          # 0-based
+    step       = st.session_state.sim_step
     soal_list  = st.session_state.sim_soal_list
     soal       = soal_list[step]
-    display_no = step + 1                            # 1-based display
+    display_no = step + 1
 
-    # ── Timer global (stabil, tidak reset navigasi) ──
+    # ── Watermark username transparan ──
+    username_wm = st.session_state.get("username", "USER").upper()
+    st.markdown(f"""
+        <div class="sim-watermark">
+            <div class="sim-watermark-text">
+                {username_wm}
+                <span>PSYCHOTECH POLRI</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # ── Timer global ──
     elapsed   = time.time() - st.session_state.sim_start_time
     total_dur = st.session_state.sim_durasi
     remaining = max(0, int(total_dur - elapsed))
 
-    # Auto-finish jika waktu habis
     if remaining <= 0:
         skor = _hitung_skor_akhir(sesi)
         save_score(st.session_state.get("username", "guest"), sesi, skor)
@@ -622,27 +703,21 @@ def show_simulation():
     elif sesi == "Kepribadian":
         _render_kepribadian(soal, step)
 
-    # ── Back button ──
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     if st.button("← Kembali ke Home", key="back_home"):
         st.session_state.page = "home"
         st.rerun()
 
-    # Refresh timer setiap detik
+    # Refresh timer
     time.sleep(1)
     st.rerun()
 
 
 # ── NAVIGASI HELPER ──
 def _nav_buttons(step: int, sesi: str):
-    """
-    Render tombol Sebelumnya / Selanjutnya / Selesai.
-    Return: True jika sesi selesai (klik Selesai di soal terakhir).
-    """
-    jawaban_step = st.session_state.sim_jawaban[step]
-    sudah_jawab  = jawaban_step is not None
-
-    is_last = (step == SOAL_TOTAL - 1)
+    jawaban_step  = st.session_state.sim_jawaban[step]
+    sudah_jawab   = jawaban_step is not None
+    is_last       = (step == SOAL_TOTAL - 1)
     answered_count = sum(1 for j in st.session_state.sim_jawaban if j is not None)
 
     st.markdown(
@@ -669,7 +744,6 @@ def _nav_buttons(step: int, sesi: str):
             lbl = "✅ SELESAI" if is_last else f"SELESAI ({answered_count}/{SOAL_TOTAL})"
             if st.button(lbl, key=f"finish_{step}_{sesi}", use_container_width=True):
                 skor = _hitung_skor_akhir(sesi)
-                # Ketahanan untuk kecermatan — tidak relevan di sini, tapi update waktu
                 save_score(st.session_state.get("username", "guest"), sesi, skor)
                 st.session_state.sim_done = True
                 st.rerun()
@@ -678,7 +752,7 @@ def _nav_buttons(step: int, sesi: str):
 # ── PASS HAND ──
 def _render_pass_hand(soal: dict, step: int):
     st.markdown(f"""
-        <div class="q-box">
+        <div class="q-box no-select">
             <div class="q-num">PERNYATAAN {step + 1} &nbsp;/&nbsp; PROFILING POLISI</div>
             <div class="pernyataan-box">{soal.get('pernyataan', '—')}</div>
             <div style="font-size:0.78rem;color:var(--text-sec);margin-top:8px;">
@@ -687,7 +761,6 @@ def _render_pass_hand(soal: dict, step: int):
         </div>
     """, unsafe_allow_html=True)
 
-    # Pilihan YA / TIDAK
     opsi = ["YA", "TIDAK"]
     current = st.session_state.sim_jawaban[step]
     idx = opsi.index(current) if current in opsi else None
@@ -710,7 +783,7 @@ def _render_pass_hand(soal: dict, step: int):
 # ── KECERDASAN ──
 def _render_kecerdasan(soal: dict, step: int):
     st.markdown(f"""
-        <div class="q-box">
+        <div class="q-box no-select">
             <div class="q-num">SOAL {step + 1} &nbsp;/&nbsp; {soal.get('kategori', 'Kecerdasan')}</div>
             <div class="q-text">{soal.get('pertanyaan', '—')}</div>
         </div>
@@ -729,24 +802,26 @@ def _render_kecerdasan(soal: dict, step: int):
     _nav_buttons(step, "Kecerdasan")
 
 
-# ── KECERMATAN (auto-submit, tanpa navigasi) ──
+# ── KECERMATAN (auto-submit, tanpa navigasi, tanpa tanda tanya) ──
 def _render_kecermatan(soal: dict, step: int):
     kunci_html = "".join(f'<div class="kunci-char">{c}</div>' for c in soal.get("kunci", []))
     kolom_nama = soal.get("nama_kolom", "KUNCI")
 
+    # Tampilan: hanya 4 karakter, tanpa "?" — user harus tahu sendiri mana yang hilang
     st.markdown(f"""
-        <div class="q-box">
+        <div class="q-box no-select">
             <div class="q-num">SOAL {step + 1} &nbsp;/&nbsp; {kolom_nama}</div>
             <div style="margin-bottom:12px;">
                 <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-sec);letter-spacing:1px;margin-bottom:8px;">KUNCI REFERENSI</div>
                 <div class="kunci-grid">{kunci_html}</div>
             </div>
-            <div class="q-text">Karakter apa yang <b style="color:var(--red-alert);">HILANG</b> dari tampilan berikut?</div>
-            <div class="tampilan-box">{soal.get('tampilan', '')}&nbsp;<span class="missing">?</span></div>
+            <div class="q-text">Karakter apa yang <b style="color:var(--red-alert);">tidak ada</b> di tampilan ini?</div>
+            <div class="tampilan-box">{soal.get('tampilan', '')}</div>
+            <div class="missing-hint">Bandingkan dengan kunci referensi di atas — pilih karakter yang hilang.</div>
         </div>
     """, unsafe_allow_html=True)
 
-    # Auto-submit: klik tombol opsi = langsung simpan + lanjut
+    # Auto-submit: klik = langsung simpan + lanjut soal
     opsi = soal.get("opsi", [])
     cols = st.columns(len(opsi))
     for i, op in enumerate(opsi):
@@ -766,23 +841,46 @@ def _render_kecermatan(soal: dict, step: int):
                 st.rerun()
 
 
-# ── KEPRIBADIAN ──
+# ── KEPRIBADIAN (Likert 5 Skala Statis) ──
 def _render_kepribadian(soal: dict, step: int):
+    arah = soal.get("arah", "positif")
+    arah_label = "Pernyataan Positif" if arah == "positif" else "Pernyataan Negatif"
+    arah_css   = "positif" if arah == "positif" else "negatif"
+
     st.markdown(f"""
-        <div class="q-box">
-            <div class="q-num">SITUASI {step + 1} &nbsp;/&nbsp; KEPRIBADIAN</div>
-            <div class="q-text">{soal.get('pertanyaan', '—')}</div>
+        <div class="q-box no-select">
+            <div class="q-num">PERNYATAAN {step + 1} &nbsp;/&nbsp; KEPRIBADIAN</div>
+            <div class="q-text">{soal.get('pernyataan', '—')}</div>
+            <div><span class="arah-badge {arah_css}">{arah_label}</span></div>
         </div>
     """, unsafe_allow_html=True)
 
-    opsi = soal.get("opsi", [])
+    # Opsi Likert statis A-E
     current = st.session_state.sim_jawaban[step]
-    idx = opsi.index(current) if current in opsi else None
+    # Ekstrak huruf dari jawaban tersimpan jika ada
+    current_huruf = current[0] if current and len(current) > 0 else None
+
+    # Render sebagai radio Streamlit dengan label custom
+    likert_labels = [
+        "A. Sangat Setuju",
+        "B. Setuju",
+        "C. Ragu-ragu",
+        "D. Tidak Setuju",
+        "E. Sangat Tidak Setuju",
+    ]
+    idx = likert_labels.index(current) if current in likert_labels else None
 
     with st.form(key=f"form_kep_{step}"):
-        pilihan = st.radio("Pilih respons:", opsi, index=idx, label_visibility="collapsed")
+        st.markdown('<div class="likert-label">Pilih Respons Anda:</div>', unsafe_allow_html=True)
+        pilihan = st.radio(
+            "Respons:",
+            likert_labels,
+            index=idx,
+            label_visibility="collapsed",
+        )
         if st.form_submit_button("SIMPAN JAWABAN", use_container_width=True):
-            st.session_state.sim_jawaban[step] = pilihan
+            # Simpan huruf awal (A/B/C/D/E) untuk scoring
+            st.session_state.sim_jawaban[step] = pilihan[0]  # cukup huruf
             st.rerun()
 
     _nav_buttons(step, "Kepribadian")
@@ -795,13 +893,16 @@ def _show_result(sesi: str):
     skor = _hitung_skor_akhir(sesi)
 
     if sesi == "Pass Hand":
-        skor_display = sum(1 for j in st.session_state.sim_jawaban if j == "YA")
+        ya_count    = sum(1 for j in st.session_state.sim_jawaban if j == "YA")
+        tidak_count = sum(1 for j in st.session_state.sim_jawaban if j == "TIDAK")
+        skip_count  = sum(1 for j in st.session_state.sim_jawaban if j is None)
+        skor_display = ya_count
         unit = "PERNYATAAN YA"
         max_ref = SOAL_TOTAL
         verdict = "✅ PROFIL TERJAWAB — Analisis kepribadian tersimpan."
         extra_html = f"""
             <div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);margin-top:14px;">
-                {skor_display} YA &nbsp;/&nbsp; {SOAL_TOTAL - skor_display} TIDAK &nbsp;/&nbsp; {sum(1 for j in st.session_state.sim_jawaban if j is None)} Tidak dijawab
+                {ya_count} YA &nbsp;/&nbsp; {tidak_count} TIDAK &nbsp;/&nbsp; {skip_count} Skip
             </div>"""
 
     elif sesi == "Kecerdasan":
@@ -831,15 +932,15 @@ def _show_result(sesi: str):
                 <div style="font-size:0.73rem;color:var(--text-sec);">{ketahanan_data['kategori']}</div>
             </div>"""
 
-    else:  # Kepribadian
+    else:  # Kepribadian Likert
         skor_display = skor
         unit = "PTS"
         max_ref = SOAL_TOTAL * 5
-        rata = round(skor / SOAL_TOTAL, 2)
-        if rata >= 4:   verdict = "🏆 PROFIL SANGAT SESUAI"
-        elif rata >= 3: verdict = "✅ PROFIL BAIK"
-        else:            verdict = "📊 PERLU EVALUASI DIRI"
-        extra_html = f'<div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);margin-top:10px;">Rata-rata per soal: {rata}</div>'
+        rata = round(skor / max(SOAL_TOTAL, 1), 2)
+        if rata >= 4.0:   verdict = "🏆 PROFIL SANGAT SESUAI"
+        elif rata >= 3.0: verdict = "✅ PROFIL BAIK"
+        else:              verdict = "📊 PERLU EVALUASI DIRI"
+        extra_html = f'<div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);margin-top:10px;">Rata-rata Likert: {rata} / 5.0</div>'
 
     pct = min(int(float(skor_display) / max(max_ref, 1) * 100), 100)
 
