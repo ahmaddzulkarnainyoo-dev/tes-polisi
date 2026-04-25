@@ -1,10 +1,10 @@
 """
-engine.py — CAT Psikotes Polri v3.0
+engine.py — CAT Psikotes Polri v3.1
 Sesi:
   1. Pass Hand   → Pernyataan YA/TIDAK (profiling polisi, skor 0)
   2. Kecerdasan  → Groq AI + template math dasar + soal spasial/mata angin
   3. Kecermatan  → Angka hilang dari kunci kolom (sesuai PDF 2025)
-  4. Kepribadian → Groq AI, skor unik per opsi
+  4. Kepribadian → Groq AI, Likert 5 skala (pernyataan + arah positif/negatif)
 """
 
 import json
@@ -60,10 +60,6 @@ _PERNYATAAN_POLISI = [
 ]
 
 def generate_pass_hand() -> dict:
-    """
-    Ambil 1 pernyataan YA/TIDAK untuk profiling polisi.
-    Skor selalu 0 (tidak mempengaruhi nilai akhir, hanya profiling).
-    """
     pernyataan, jawaban_ideal = random.choice(_PERNYATAAN_POLISI)
     return {
         "pernyataan": pernyataan,
@@ -73,7 +69,6 @@ def generate_pass_hand() -> dict:
     }
 
 def hitung_aps(jumlah_klik: int, durasi_detik: float) -> dict:
-    """Legacy compat — tidak dipakai di UI baru tapi dipertahankan."""
     aps = round(jumlah_klik / max(durasi_detik, 0.001), 2)
     if aps >= 3.0:
         kategori, deskripsi = "Sangat Baik", "Koordinasi mata-tangan sangat responsif."
@@ -101,10 +96,7 @@ def posisi_target_acak(area_width: int, area_height: int, target_size: int) -> d
 # 2. KECERDASAN
 # ══════════════════════════════════════════════
 
-# ── 2a. Matematika Dasar (template acak, hemat token) ──
-
 def _soal_matematika() -> dict:
-    """Generate soal matematika dasar secara lokal tanpa AI."""
     tipe = random.choice(["campuran", "perkalian", "pembagian", "pecahan", "persentase"])
 
     if tipe == "campuran":
@@ -129,31 +121,15 @@ def _soal_matematika() -> dict:
         soal = f"Berapakah hasil dari {a} ÷ {b}?"
 
     elif tipe == "pecahan":
-        # a/b + c/d → samakan penyebut
         b = random.choice([4, 6, 8, 12])
         d = random.choice([3, 4, 6])
         a = random.randint(1, b - 1)
         c = random.randint(1, d - 1)
         from math import gcd
-        lcm = b * d // gcd(b, d)
-        num = a * (lcm // b) + c * (lcm // d)
-        g = gcd(num, lcm)
-        num, lcm = num // g, lcm // g
-        if lcm == 1:
-            jawaban = num
-            soal = f"Berapakah hasil dari {a}/{b} + {c}/{d}?"
-        else:
-            jawaban_str = f"{num}/{lcm}"
-            soal = f"Berapakah hasil dari {a}/{b} + {c}/{d}?"
-            # buat opsi dengan nilai desimal untuk pilihan ganda
-            import fractions
-            val = fractions.Fraction(a, b) + fractions.Fraction(c, d)
-            jawaban = str(val)
-            # konversi ke string yang rapi
-            if val.denominator == 1:
-                jawaban = str(val.numerator)
-            else:
-                jawaban = f"{val.numerator}/{val.denominator}"
+        import fractions
+        val = fractions.Fraction(a, b) + fractions.Fraction(c, d)
+        jawaban = str(val.numerator) if val.denominator == 1 else f"{val.numerator}/{val.denominator}"
+        soal = f"Berapakah hasil dari {a}/{b} + {c}/{d}?"
 
     else:  # persentase
         persen = random.choice([10, 15, 20, 25, 30, 40, 50])
@@ -161,28 +137,23 @@ def _soal_matematika() -> dict:
         jawaban = total * persen // 100
         soal = f"Berapa {persen}% dari {total}?"
 
-    # buat 4 distraktor
     if isinstance(jawaban, str):
         import fractions
         base = fractions.Fraction(jawaban)
-        # gunakan desimal untuk opsi
         val_float = float(base)
         benar = jawaban
         distractors = set()
         for delta in [0.25, 0.5, -0.25, -0.5, 1, -1]:
             d = fractions.Fraction(val_float + delta).limit_denominator(12)
             if d != base:
-                if d.denominator == 1:
-                    distractors.add(str(d.numerator))
-                else:
-                    distractors.add(f"{d.numerator}/{d.denominator}")
-        distractors = list(distractors)[:4]
+                distractors.add(str(d.numerator) if d.denominator == 1 else f"{d.numerator}/{d.denominator}")
+        distractors = list(distractors)[:3]
     else:
         benar = jawaban
         deltas = random.sample([-3, -2, -1, 1, 2, 3, 4, 5, -4, -5], 4)
-        distractors = [benar + d for d in deltas]
+        distractors = [benar + d for d in deltas[:3]]
 
-    opsi_vals = [benar] + distractors[:3]
+    opsi_vals = [benar] + distractors
     random.shuffle(opsi_vals)
     huruf = ["A", "B", "C", "D", "E"]
     opsi = [f"{huruf[i]}. {opsi_vals[i]}" for i in range(len(opsi_vals))]
@@ -197,8 +168,6 @@ def _soal_matematika() -> dict:
         "skor_salah": 0,
     }
 
-
-# ── 2b. Spasial / Mata Angin ──
 
 _ARAH = ["Utara", "Selatan", "Timur", "Barat", "Timur Laut", "Barat Laut", "Tenggara", "Barat Daya"]
 _ARAH_LAWAN = {
@@ -231,7 +200,7 @@ def _soal_spasial() -> dict:
         derajat = kali * 90
         soal = f"Seorang polisi menghadap {arah_awal}, lalu berputar {derajat}° searah jarum jam. Ia kini menghadap ke arah ....?"
 
-    else:  # denah jarak
+    else:
         jarak1 = random.randint(2, 8)
         jarak2 = random.randint(2, 8)
         arah1 = random.choice(["Utara", "Selatan"])
@@ -241,20 +210,15 @@ def _soal_spasial() -> dict:
             f"kemudian {jarak2} km ke {arah2}. "
             f"Berapa km jarak lurus Rudi dari Pos A?"
         )
-        import math
-        jawaban_val = round(math.sqrt(jarak1**2 + jarak2**2), 2)
-        # bulatkan ke 1 desimal
-        jawaban_val = round(jawaban_val, 1)
+        jawaban_val = round(math.sqrt(jarak1**2 + jarak2**2), 1)
         jawaban_str = str(jawaban_val)
 
-    # buat opsi
     if tipe in ("lawan_arah", "putar_90"):
         pilihan = [jawaban_str]
         pool = [a for a in _ARAH if a != jawaban_str]
         random.shuffle(pool)
         pilihan += pool[:3]
     else:
-        import math
         base = float(jawaban_str)
         deltas = [-1.0, -0.5, 0.5, 1.0, 1.5, -1.5]
         random.shuffle(deltas)
@@ -283,8 +247,6 @@ def _soal_spasial() -> dict:
     }
 
 
-# ── 2c. Kecerdasan Groq (verbal, logika, wawas kebangsaan) ──
-
 _FALLBACK_KECERDASAN = {
     "pertanyaan": "Jika 3x + 7 = 22, berapakah nilai x?",
     "opsi": ["A. 3", "B. 4", "C. 5", "D. 6", "E. 7"],
@@ -295,17 +257,12 @@ _FALLBACK_KECERDASAN = {
 }
 
 def generate_soal_kecerdasan(kategori: str = "acak") -> dict:
-    """
-    Gabungan: 40% Matematika lokal, 20% Spasial lokal, 40% Groq AI.
-    Hemat token secara signifikan.
-    """
     if kategori == "acak":
         roll = random.random()
         if roll < 0.40:
             return _soal_matematika()
         elif roll < 0.60:
             return _soal_spasial()
-        # else fall through ke Groq
 
     groq_kategori_pool = ["Verbal", "Logika", "Wawasan Kebangsaan"]
     if kategori in groq_kategori_pool:
@@ -344,10 +301,9 @@ def nilai_jawaban_kecerdasan(jawaban_user: str, jawaban_benar: str) -> int:
 
 
 # ══════════════════════════════════════════════
-# 3. KECERMATAN — Angka Hilang (sesuai PDF 2025)
+# 3. KECERMATAN — Karakter Hilang (sesuai PDF 2025)
 # ══════════════════════════════════════════════
 
-# Kunci kolom dari PDF (5 karakter per kolom, alfanumerik campuran)
 _KUNCI_KOLOM = [
     {"nama": "KOLOM 1", "kunci": list("ZPTXQ")},
     {"nama": "KOLOM 2", "kunci": list("YLKJC")},
@@ -358,9 +314,8 @@ _KUNCI_KOLOM = [
 
 def generate_kecermatan() -> dict:
     """
-    Soal kecermatan: tampilkan 4 karakter dari kunci 5-karakter,
-    user harus memilih karakter yang hilang.
-    Format sesuai PDF Bintara 2025.
+    Tampilkan 4 dari 5 karakter kunci, user pilih yang hilang.
+    Tidak ada tanda tanya — user harus mandiri mengenali karakter yang absen.
     """
     kolom = random.choice(_KUNCI_KOLOM)
     kunci = kolom["kunci"].copy()
@@ -422,50 +377,77 @@ def nilai_jawaban_kecermatan(jawaban_user: str, jawaban_benar: str) -> int:
 
 
 # ══════════════════════════════════════════════
-# 4. KEPRIBADIAN (Groq)
+# 4. KEPRIBADIAN — Likert 5 Skala
 # ══════════════════════════════════════════════
+# Format baru: AI hanya generate PERNYATAAN + arah (positif/negatif).
+# Opsi A–E ditampilkan statis di app.py.
+# Skor:
+#   Pernyataan POSITIF → SS=5, S=4, RR=3, TS=2, STS=1
+#   Pernyataan NEGATIF → SS=1, S=2, RR=3, TS=4, STS=5
+
+LIKERT_OPSI = [
+    "A. Sangat Setuju",
+    "B. Setuju",
+    "C. Ragu-ragu",
+    "D. Tidak Setuju",
+    "E. Sangat Tidak Setuju",
+]
+
+LIKERT_SKOR_POSITIF = {"A": 5, "B": 4, "C": 3, "D": 2, "E": 1}
+LIKERT_SKOR_NEGATIF = {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5}
 
 _FALLBACK_KEPRIBADIAN = {
-    "pertanyaan": "Jika Anda melihat rekan kerja berbuat curang, apa yang Anda lakukan?",
-    "opsi": ["A. Melaporkan langsung ke atasan", "B. Menegur secara personal",
-             "C. Diam dan mengamati lebih lanjut", "D. Ikut-ikutan saja"],
-    "skor": {"A": 5, "B": 4, "C": 2, "D": 1},
+    "pernyataan": "Saya selalu melaporkan pelanggaran yang saya saksikan meskipun pelakunya adalah rekan dekat.",
+    "arah": "positif",
     "kategori": "Kepribadian",
 }
 
-
 def generate_soal_kepribadian() -> dict:
-    prompt = """Buat 1 soal tes kepribadian Polri ukur integritas/kedisiplinan. 4 opsi, skor BERBEDA dari {1,2,3,4,5}.
-HANYA JSON:
-{"pertanyaan":"...","opsi":["A. ...","B. ...","C. ...","D. ..."],"skor":{"A":5,"B":4,"C":2,"D":1},"kategori":"Kepribadian"}"""
+    """
+    Generate PERNYATAAN psikologis saja (Likert).
+    Opsi dan skor dihitung di app.py secara statis.
+    Arah 'positif' = setuju berarti baik; 'negatif' = setuju berarti buruk.
+    """
+    prompt = """Buat 1 pernyataan tes kepribadian Polri untuk Likert scale.
+Tema: integritas, kedisiplinan, loyalitas, profesionalisme, atau etika.
+Tentukan apakah pernyataan bersifat POSITIF (setuju = baik) atau NEGATIF (setuju = buruk).
+HANYA JSON tanpa markdown:
+{"pernyataan":"...","arah":"positif","kategori":"Kepribadian"}
+Arah hanya boleh: "positif" atau "negatif"."""
 
     try:
         client = get_client()
         resp = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.8,
-            max_tokens=350,
+            temperature=0.85,
+            max_tokens=200,
         )
         raw = resp.choices[0].message.content
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         data = json.loads(match.group() if match else raw)
-        skor = data.get("skor", {})
-        if not isinstance(skor, dict) or len(set(skor.values())) < 4:
-            huruf = ["A", "B", "C", "D"]
-            nilai = random.sample([1, 2, 3, 4, 5], 4)
-            data["skor"] = dict(zip(huruf, nilai))
+        if "pernyataan" not in data:
+            raise ValueError("pernyataan missing")
+        arah = str(data.get("arah", "positif")).lower().strip()
+        if arah not in ("positif", "negatif"):
+            arah = "positif"
+        data["arah"] = arah
         data["kategori"] = "Kepribadian"
-        if "opsi" not in data or len(data["opsi"]) < 4:
-            raise ValueError
         return data
     except Exception:
         return _FALLBACK_KEPRIBADIAN.copy()
 
 
-def nilai_jawaban_kepribadian(jawaban_user: str, skor_opsi: dict) -> int:
+def nilai_jawaban_kepribadian(jawaban_user: str, arah: str) -> int:
+    """
+    Hitung skor berdasarkan jawaban Likert dan arah pernyataan.
+    jawaban_user: huruf A/B/C/D/E
+    arah: 'positif' atau 'negatif'
+    """
     key = str(jawaban_user).strip().upper()[0]
-    return skor_opsi.get(key, 1)
+    if arah == "negatif":
+        return LIKERT_SKOR_NEGATIF.get(key, 3)
+    return LIKERT_SKOR_POSITIF.get(key, 3)
 
 
 # ══════════════════════════════════════════════
