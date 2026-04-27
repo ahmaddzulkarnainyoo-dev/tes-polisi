@@ -343,7 +343,7 @@ def login_user(username: str, password: str):
 '<h5>⏳ Akun Belum Aktif</h5>'
 '<div class="pay-row">📱 Kirim bukti bayar via <strong>WhatsApp</strong></div>'
 '<div class="pay-row">📞 <strong>0853-6637-4530</strong></div>'
-'<div class="pay-row">🏦 BRI: <strong>1234-5678-9012-3456</strong> a.n. Growing Together</div>'
+'<div class="pay-row">🏦 SEABANK: <strong>1234-5678-9012-3456</strong> a.n. Growing Together</div>'
 '<div class="pay-row">💰 Biaya Aktivasi: <strong>Rp 25.000</strong></div>'
 '</div>', unsafe_allow_html=True)
             st.stop()
