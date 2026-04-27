@@ -1,18 +1,19 @@
 """
 app.py — Psychotech Polri | Arena CAT v4.0 (Marathon Edition)
 Changelog v4.0:
+- HTML Cleaned: Tidak ada lagi <div> terekspos karena salah parsing Markdown
+- JS Injected: Anti-Click Kanan, Anti-Copy, Auto-Scroll tiap render
 - Alur Maraton: Pass Hand → Kecerdasan → Kepribadian → Kecermatan (satu alur kontinu)
 - Nilai hanya muncul di akhir semua sesi, dengan status MS/TMS (passing grade 61)
 - Halaman Evaluasi: Review jawaban salah per sesi setelah nilai akhir keluar
 - Skor 0-100 per sesi: Kecerdasan & Kecermatan (Benar/Total*100), Kepribadian (Likert→100)
 - Pass Hand: skor ideal-match ke 0-100
-- Anti-copas: CSS user-select disabled + watermark username transparan
-- Leaderboard Top 5 di Home (Supabase)
-- Navigasi Sebelumnya/Selanjutnya (kecuali Kecermatan auto-submit)
 """
 
 import streamlit as st
 import time
+import random
+import streamlit.components.v1 as components
 from engine import (
     generate_soal,
     skor_sesi_pass_hand,
@@ -34,6 +35,33 @@ st.set_page_config(
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="collapsed",
+)
+
+# ══════════════════════════════════════════════
+# JAVASCRIPT PROTEKSI & AUTO-SCROLL
+# ══════════════════════════════════════════════
+components.html(
+    """
+    <script>
+    const parentDoc = window.parent.document;
+    
+    // Anti klik kanan
+    parentDoc.addEventListener('contextmenu', event => event.preventDefault());
+    
+    // Anti select, copy, print (Ctrl+C, Ctrl+S, dll)
+    parentDoc.addEventListener('keydown', event => {
+        if (event.ctrlKey || event.metaKey) {
+            if (['c', 'p', 's', 'u', 'a'].includes(event.key.toLowerCase())) {
+                event.preventDefault();
+            }
+        }
+    });
+
+    // Auto scroll ke paling atas tiap halaman render ulang
+    window.parent.scrollTo({top: 0, behavior: 'smooth'});
+    </script>
+    """,
+    height=0, width=0,
 )
 
 # ══════════════════════════════════════════════
@@ -83,8 +111,8 @@ html, body, [class*="css"] { font-family: var(--body) !important; background-col
     pointer-events: none; z-index: 9999;
 }
 
-/* ── Anti-Copas ── */
-.no-select, .q-box, .pernyataan-box, .kunci-grid, .tampilan-box, .q-text {
+/* ── Anti-Copas (Layer 2 CSS) ── */
+.no-select, .q-box, .pernyataan-box, .kunci-grid, .tampilan-box, .q-text, p, div, span {
     -webkit-user-select: none !important;
     -moz-user-select: none !important;
     -ms-user-select: none !important;
@@ -93,19 +121,22 @@ html, body, [class*="css"] { font-family: var(--body) !important; background-col
 
 /* ── Watermark ── */
 .sim-watermark {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
     display: flex; align-items: center; justify-content: center;
     pointer-events: none; z-index: 1000; overflow: hidden;
 }
 .sim-watermark-text {
     font-family: var(--display); font-size: 4.5rem; font-weight: 900;
     color: rgba(251,107,0,0.045); text-transform: uppercase;
-    letter-spacing: 6px; transform: rotate(-30deg); white-space: nowrap;
+    letter-spacing: 6px; transform: rotate(-30deg);
+    white-space: nowrap;
     text-align: center; line-height: 1.2;
 }
 .sim-watermark-text span {
     display: block; font-size: 2rem; letter-spacing: 10px;
-    color: rgba(255,255,255,0.025); margin-top: 6px;
+    color: rgba(255,255,255,0.025);
+    margin-top: 6px;
 }
 
 /* ── Panels ── */
@@ -115,7 +146,8 @@ html, body, [class*="css"] { font-family: var(--body) !important; background-col
 /* ── Hero ── */
 .hero-command {
     background: linear-gradient(135deg,#0d1117 0%,#161b22 50%,#1a1f2e 100%);
-    border: 1px solid var(--border-dim); border-top: 2px solid var(--accent);
+    border: 1px solid var(--border-dim);
+    border-top: 2px solid var(--accent);
     border-radius: var(--r-lg); padding: 40px 32px 36px;
     position: relative; overflow: hidden; margin-bottom: 24px;
 }
@@ -148,7 +180,7 @@ html, body, [class*="css"] { font-family: var(--body) !important; background-col
 .arena-card .ac-meta { display:flex; gap:6px; flex-wrap:wrap; }
 .meta-tag { font-family:var(--mono); font-size:0.63rem; color:var(--accent); background:var(--accent-dim); border:1px solid var(--border-glow); border-radius:3px; padding:2px 6px; text-transform:uppercase; }
 
-/* ── Maraton Progress Bar (sesi) ── */
+/* ── Maraton Progress Bar ── */
 .maraton-track { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
 .maraton-step { flex:1; min-width:100px; background:var(--bg-elevated); border:1px solid var(--border-dim); border-radius:var(--r-sm); padding:10px 12px; text-align:center; position:relative; }
 .maraton-step.active { border-color:var(--accent); background:var(--accent-dim); }
@@ -278,7 +310,6 @@ div[data-testid="stProgress"] > div > div { background:var(--accent) !important;
 .footer-credit { text-align:center; padding:22px 0 8px; font-size:0.76rem; color:var(--text-dim); }
 .footer-credit a { color:var(--accent); text-decoration:none; font-weight:600; }
 
-/* ── Responsive ── */
 @media (max-width:640px) {
     .arena-grid,.skor-grid,.maraton-track { grid-template-columns:1fr; flex-direction:column; }
     .stat-row { flex-direction:column; }
@@ -299,7 +330,6 @@ SESI_CONFIG = {
     "Kecermatan":  {"icon": "🎯", "label": "KECERMATAN",  "timer": 20, "color": "#58a6ff"},
 }
 
-
 # ══════════════════════════════════════════════
 # DB HELPERS
 # ══════════════════════════════════════════════
@@ -308,15 +338,14 @@ def login_user(username: str, password: str):
     if res.data:
         user = res.data[0]
         if user.get("status") == "pending":
-            st.markdown("""
-                <div class="pay-box">
-                    <h5>⏳ Akun Belum Aktif</h5>
-                    <div class="pay-row">📱 Kirim bukti bayar via <strong>WhatsApp</strong></div>
-                    <div class="pay-row">📞 <strong>0853-6637-4530</strong></div>
-                    <div class="pay-row">🏦 BRI: <strong>1234-5678-9012-3456</strong> a.n. Growing Together</div>
-                    <div class="pay-row">💰 Biaya Aktivasi: <strong>Rp 25.000</strong></div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+'<div class="pay-box">'
+'<h5>⏳ Akun Belum Aktif</h5>'
+'<div class="pay-row">📱 Kirim bukti bayar via <strong>WhatsApp</strong></div>'
+'<div class="pay-row">📞 <strong>0853-6637-4530</strong></div>'
+'<div class="pay-row">🏦 BRI: <strong>1234-5678-9012-3456</strong> a.n. Growing Together</div>'
+'<div class="pay-row">💰 Biaya Aktivasi: <strong>Rp 25.000</strong></div>'
+'</div>', unsafe_allow_html=True)
             st.stop()
         return user
     return None
@@ -329,7 +358,6 @@ def register_user(username: str, password: str) -> bool:
         return False
 
 def save_score_maraton(username: str, rata_rata: int, status: str):
-    """Simpan skor maraton (rata-rata semua sesi) ke tabel scores."""
     try:
         supabase.table("scores").insert({
             "username": username,
@@ -342,16 +370,10 @@ def save_score_maraton(username: str, rata_rata: int, status: str):
 
 def get_leaderboard(limit: int = 5) -> list:
     try:
-        res = supabase.table("scores")\
-            .select("username, skor, status")\
-            .eq("sesi", "MARATON")\
-            .order("skor", desc=True)\
-            .limit(limit)\
-            .execute()
+        res = supabase.table("scores").select("username, skor, status").eq("sesi", "MARATON").order("skor", desc=True).limit(limit).execute()
         return res.data or []
     except Exception:
         return []
-
 
 # ══════════════════════════════════════════════
 # LEADERBOARD COMPONENT
@@ -367,32 +389,28 @@ def display_leaderboard():
         status = row.get("status", "—")
         st_color = "#39d353" if status == "MS" else "#f85149"
         row_cls = f"lb-row-{i}" if i <= 3 else ""
-        rows_html += f"""
-        <tr class="{row_cls}">
-            <td><span class="lb-rank {cls}">{medal or f'#{i}'}</span></td>
-            <td style="font-weight:600;">{uname}</td>
-            <td><span style="font-family:var(--mono);font-size:0.72rem;color:{st_color};font-weight:700;">{status}</span></td>
-            <td><span class="lb-score">{skor}</span></td>
-        </tr>"""
+        
+        # Flushed to avoid markdown block rendering
+        rows_html += f'<tr class="{row_cls}">'
+        rows_html += f'<td><span class="lb-rank {cls}">{medal or f"#{i}"}</span></td>'
+        rows_html += f'<td style="font-weight:600;">{uname}</td>'
+        rows_html += f'<td><span style="font-family:var(--mono);font-size:0.72rem;color:{st_color};font-weight:700;">{status}</span></td>'
+        rows_html += f'<td><span class="lb-score">{skor}</span></td>'
+        rows_html += '</tr>'
 
     if not rows_html:
         rows_html = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:24px 0;">Belum ada data</td></tr>'
 
-    st.markdown(f"""
-        <div class="panel" style="padding:18px;">
-            <table class="lb-table">
-                <thead><tr><th>#</th><th>Username</th><th>Status</th><th>Rata-rata</th></tr></thead>
-                <tbody>{rows_html}</tbody>
-            </table>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="panel" style="padding:18px;">'
+'<table class="lb-table">'
+'<thead><tr><th>#</th><th>Username</th><th>Status</th><th>Rata-rata</th></tr></thead>'
+f'<tbody>{rows_html}</tbody>'
+'</table>'
+'</div>', unsafe_allow_html=True)
 
-    # Skor terbaik user sendiri
     try:
-        res = supabase.table("scores").select("skor, status")\
-            .eq("username", st.session_state.get("username", ""))\
-            .eq("sesi", "MARATON")\
-            .order("skor", desc=True).limit(1).execute()
+        res = supabase.table("scores").select("skor, status").eq("username", st.session_state.get("username", "")).eq("sesi", "MARATON").order("skor", desc=True).limit(1).execute()
         my = res.data or []
     except Exception:
         my = []
@@ -400,26 +418,23 @@ def display_leaderboard():
     if my:
         best = my[0]
         st_color = "#39d353" if best.get("status") == "MS" else "#f85149"
-        st.markdown(f"""
-            <div class="panel-sm" style="margin-top:12px;text-align:center;">
-                <span style="font-family:var(--mono);font-size:0.62rem;color:var(--text-sec);letter-spacing:1.5px;text-transform:uppercase;">BEST SCORE LO</span>
-                <div style="font-family:var(--display);font-size:2.4rem;font-weight:900;color:{st_color};">{best['skor']}</div>
-                <div style="font-family:var(--mono);font-size:0.75rem;color:{st_color};">● {best.get('status','—')}</div>
-            </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown(
+'<div class="panel-sm" style="margin-top:12px;text-align:center;">'
+'<span style="font-family:var(--mono);font-size:0.62rem;color:var(--text-sec);letter-spacing:1.5px;text-transform:uppercase;">BEST SCORE LO</span>'
+f'<div style="font-family:var(--display);font-size:2.4rem;font-weight:900;color:{st_color};">{best["skor"]}</div>'
+f'<div style="font-family:var(--mono);font-size:0.75rem;color:{st_color};">● {best.get("status","—")}</div>'
+'</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
 # AUTH PAGE
 # ══════════════════════════════════════════════
 def show_auth():
-    st.markdown("""
-        <div class="auth-logo">
-            <span class="badge">[ CAT SYSTEM v4.0 ]</span>
-            <div class="name">PSYCHO<span>TECH</span></div>
-            <div class="sub">Platform Simulasi CAT Psikotes Polri — Marathon Edition</div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="auth-logo">'
+'<span class="badge">[ CAT SYSTEM v4.0 ]</span>'
+'<div class="name">PSYCHO<span>TECH</span></div>'
+'<div class="sub">Platform Simulasi CAT Psikotes Polri — Marathon Edition</div>'
+'</div>', unsafe_allow_html=True)
 
     col_l, col_m, col_r = st.columns([1, 2.2, 1])
     with col_m:
@@ -455,51 +470,45 @@ def show_auth():
                         st.success(f"✅ Akun **{nu}** dibuat. Login untuk instruksi aktivasi.")
                     else:
                         st.error("❌ Username sudah dipakai.")
-            st.markdown("""
-                <div class="pay-box">
-                    <h5>💳 Cara Aktivasi</h5>
-                    <div class="pay-row">1. Daftar lalu <strong>Login</strong> dengan akun baru</div>
-                    <div class="pay-row">2. Transfer BRI: <strong>1234-5678-9012-3456</strong> — <strong>Rp 25.000</strong></div>
-                    <div class="pay-row">3. WA bukti ke: <strong>0853-6637-4530</strong></div>
-                    <div class="pay-row">✅ Aktivasi <strong>dalam 1×24 jam</strong></div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+'<div class="pay-box">'
+'<h5>💳 Cara Aktivasi</h5>'
+'<div class="pay-row">1. Daftar lalu <strong>Login</strong> dengan akun baru</div>'
+'<div class="pay-row">2. Transfer BRI: <strong>1234-5678-9012-3456</strong> — <strong>Rp 25.000</strong></div>'
+'<div class="pay-row">3. WA bukti ke: <strong>0853-6637-4530</strong></div>'
+'<div class="pay-row">✅ Aktivasi <strong>dalam 1×24 jam</strong></div>'
+'</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("""
-        <div class="footer-credit">
-            🚀 <b>Project Development</b> &nbsp;|&nbsp;
-            <a href="https://www.instagram.com/growing_together369" target="_blank">@growing_together369</a>
-        </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown(
+'<div class="footer-credit">'
+'🚀 <b>Project Development</b> &nbsp;|&nbsp;'
+'<a href="https://www.instagram.com/growing_together369" target="_blank">@growing_together369</a>'
+'</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
 # HOME PAGE
 # ══════════════════════════════════════════════
 def show_home():
-    st.markdown(f"""
-        <div class="hero-command">
-            <div class="hero-rank">[ MARATON v4.0 — SEMUA SESI ]</div>
-            <h1 class="hero-title">ARENA<br><span>MARATON</span><br>CAT POLRI</h1>
-            <p class="hero-sub">Simulasi 4 sesi berurutan: Pass Hand → Kecerdasan → Kepribadian → Kecermatan.
-            Nilai hanya muncul di akhir. Passing Grade rata-rata <b style="color:var(--accent);">≥ {PASSING_GRADE}</b>.</p>
-            <div class="stat-row">
-                <div class="stat-chip"><span class="n">4</span><span class="l">Sesi Ujian</span></div>
-                <div class="stat-chip"><span class="n">{SOAL_PER_SESI*4}</span><span class="l">Total Soal</span></div>
-                <div class="stat-chip"><span class="n">{PASSING_GRADE}</span><span class="l">Passing Grade</span></div>
-                <div class="stat-chip"><span class="n">24/7</span><span class="l">Akses Penuh</span></div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="hero-command">'
+'<div class="hero-rank">[ MARATON v4.0 — SEMUA SESI ]</div>'
+'<h1 class="hero-title">ARENA<br><span>MARATON</span><br>CAT POLRI</h1>'
+f'<p class="hero-sub">Simulasi 4 sesi berurutan: Pass Hand → Kecerdasan → Kepribadian → Kecermatan. Nilai hanya muncul di akhir. Passing Grade rata-rata <b style="color:var(--accent);">≥ {PASSING_GRADE}</b>.</p>'
+'<div class="stat-row">'
+'<div class="stat-chip"><span class="n">4</span><span class="l">Sesi Ujian</span></div>'
+f'<div class="stat-chip"><span class="n">{SOAL_PER_SESI*4}</span><span class="l">Total Soal</span></div>'
+f'<div class="stat-chip"><span class="n">{PASSING_GRADE}</span><span class="l">Passing Grade</span></div>'
+'<div class="stat-chip"><span class="n">24/7</span><span class="l">Akses Penuh</span></div>'
+'</div>'
+'</div>', unsafe_allow_html=True)
 
     col_main, col_lb = st.columns([3, 2], gap="large")
 
     with col_main:
-        st.markdown("""
-            <div class="sec-head"><div class="sec-head-line"></div>
-            <div class="sec-head-text">Urutan Sesi Maraton</div></div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+'<div class="sec-head"><div class="sec-head-line"></div>'
+'<div class="sec-head-text">Urutan Sesi Maraton</div></div>', unsafe_allow_html=True)
 
         sesi_data = [
             {"key": "Pass Hand",   "icon": "📋", "title": "PASS HAND",   "desc": "10 pernyataan YA/TIDAK profiling polisi. Kejujuran adalah kuncinya.", "tags": ["Sesi 1", "10 Soal", "45 Dtk/Soal"], "accent": "#fb6b00"},
@@ -511,14 +520,13 @@ def show_home():
         st.markdown('<div class="arena-grid">', unsafe_allow_html=True)
         for s in sesi_data:
             tags_html = "".join(f'<span class="meta-tag">{t}</span>' for t in s["tags"])
-            st.markdown(f"""
-                <div class="arena-card" style="--card-accent:{s['accent']};">
-                    <span class="ac-icon">{s['icon']}</span>
-                    <div class="ac-title">{s['title']}</div>
-                    <div class="ac-desc">{s['desc']}</div>
-                    <div class="ac-meta">{tags_html}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+f'<div class="arena-card" style="--card-accent:{s["accent"]};">'
+f'<span class="ac-icon">{s["icon"]}</span>'
+f'<div class="ac-title">{s["title"]}</div>'
+f'<div class="ac-desc">{s["desc"]}</div>'
+f'<div class="ac-meta">{tags_html}</div>'
+'</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
         if st.button("🚀 MULAI MARATON — 4 SESI BERURUTAN", key="start_maraton", use_container_width=True):
@@ -527,50 +535,42 @@ def show_home():
             st.rerun()
 
     with col_lb:
-        st.markdown("""
-            <div class="sec-head"><div class="sec-head-line"></div>
-            <div class="sec-head-text">🏆 Leaderboard Maraton</div></div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+'<div class="sec-head"><div class="sec-head-line"></div>'
+'<div class="sec-head-text">🏆 Leaderboard Maraton</div></div>', unsafe_allow_html=True)
         display_leaderboard()
 
-    st.markdown("""
-        <div class="footer-credit">
-            🚀 <b>Project Development</b> &nbsp;|&nbsp;
-            <a href="https://www.instagram.com/growing_together369" target="_blank">@growing_together369</a>
-        </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown(
+'<div class="footer-credit">'
+'🚀 <b>Project Development</b> &nbsp;|&nbsp;'
+'<a href="https://www.instagram.com/growing_together369" target="_blank">@growing_together369</a>'
+'</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
 # INISIASI MARATON
 # ══════════════════════════════════════════════
 def _init_maraton():
-    """Inisialisasi state untuk satu putaran maraton penuh."""
-    st.session_state.mar_sesi_idx   = 0                  # index ke URUTAN_MARATON
-    st.session_state.mar_step       = 0                  # soal ke-N dalam sesi aktif
-    st.session_state.mar_done       = False              # maraton selesai?
-    st.session_state.mar_hasil      = {}                 # {"Pass Hand": {...}, ...}
-    st.session_state.mar_start_sesi = time.time()        # waktu mulai sesi aktif
+    st.session_state.mar_sesi_idx   = 0
+    st.session_state.mar_step       = 0
+    st.session_state.mar_done       = False
+    st.session_state.mar_hasil      = {}
+    st.session_state.mar_start_sesi = time.time()
 
-    # Pra-generate SEMUA soal untuk semua sesi sekaligus
+    # Generate AND Shuffle biar beda terus tiap main
     st.session_state.mar_soal = {}
     for sesi in URUTAN_MARATON:
-        st.session_state.mar_soal[sesi] = [generate_soal(sesi) for _ in range(SOAL_PER_SESI)]
+        soals = [generate_soal(sesi) for _ in range(SOAL_PER_SESI)]
+        random.shuffle(soals)
+        st.session_state.mar_soal[sesi] = soals
 
     st.session_state.mar_jawaban    = {s: [None] * SOAL_PER_SESI for s in URUTAN_MARATON}
     st.session_state.mar_waktu_soal = {s: [None] * SOAL_PER_SESI for s in URUTAN_MARATON}
     st.session_state.mar_waktu_kecermatan = []
 
-
 def _sesi_aktif() -> str:
     return URUTAN_MARATON[st.session_state.mar_sesi_idx]
 
-
 def _selesai_sesi():
-    """
-    Hitung skor sesi aktif, simpan ke mar_hasil, lanjut ke sesi berikutnya.
-    Jika semua sesi selesai, set mar_done=True dan simpan ke Supabase.
-    """
     sesi      = _sesi_aktif()
     soal_list = st.session_state.mar_soal[sesi]
     jawaban   = st.session_state.mar_jawaban[sesi]
@@ -581,17 +581,15 @@ def _selesai_sesi():
         hasil = skor_sesi_kecerdasan(soal_list, jawaban)
     elif sesi == "Kepribadian":
         hasil = skor_sesi_kepribadian(soal_list, jawaban)
-    else:  # Kecermatan
+    else:
         waktu = st.session_state.mar_waktu_kecermatan
         hasil = skor_sesi_kecermatan(soal_list, jawaban, waktu)
 
     st.session_state.mar_hasil[sesi] = hasil
 
-    # Lanjut atau selesai
     next_idx = st.session_state.mar_sesi_idx + 1
     if next_idx >= len(URUTAN_MARATON):
         st.session_state.mar_done = True
-        # Simpan ke leaderboard
         rekap = rekap_maraton({s: v["skor_100"] for s, v in st.session_state.mar_hasil.items()})
         save_score_maraton(
             st.session_state.get("username", "guest"),
@@ -603,7 +601,6 @@ def _selesai_sesi():
         st.session_state.mar_sesi_idx   = next_idx
         st.session_state.mar_step       = 0
         st.session_state.mar_start_sesi = time.time()
-
 
 # ══════════════════════════════════════════════
 # SIMULASI — MAIN
@@ -618,21 +615,19 @@ def show_simulation():
     step  = st.session_state.mar_step
     soal  = st.session_state.mar_soal[sesi][step]
 
-    # ── Watermark username ──
+    # Watermark
     username_wm = st.session_state.get("username", "USER").upper()
-    st.markdown(f"""
-        <div class="sim-watermark">
-            <div class="sim-watermark-text">
-                {username_wm}
-                <span>PSYCHOTECH POLRI</span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="sim-watermark">'
+'<div class="sim-watermark-text">'
+f'{username_wm}'
+'<span>PSYCHOTECH POLRI</span>'
+'</div>'
+'</div>', unsafe_allow_html=True)
 
-    # ── Maraton Track ──
     _render_maraton_track(sesi)
 
-    # ── Timer per sesi ──
+    # Timer
     elapsed   = time.time() - st.session_state.mar_start_sesi
     total_dur = cfg["timer"] * SOAL_PER_SESI
     remaining = max(0, int(total_dur - elapsed))
@@ -646,29 +641,22 @@ def show_simulation():
     mins, secs = divmod(remaining, 60)
     timer_str  = f"{mins:02d}:{secs:02d}"
 
-    # ── Sim Header ──
     sesi_no = URUTAN_MARATON.index(sesi) + 1
-    st.markdown(f"""
-        <div class="sim-hdr">
-            <div class="sim-hdr-left">
-                <div class="sesi-label">[ SESI {sesi_no}/4 — MARATON ]</div>
-                <div class="sesi-title">{cfg['icon']} {cfg['label']}</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                <div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);">
-                    SOAL {step+1}/{SOAL_PER_SESI}
-                </div>
-                <div class="timer-box {timer_cls}">{timer_str}</div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="sim-hdr">'
+'<div class="sim-hdr-left">'
+f'<div class="sesi-label">[ SESI {sesi_no}/4 — MARATON ]</div>'
+f'<div class="sesi-title">{cfg["icon"]} {cfg["label"]}</div>'
+'</div>'
+'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+f'<div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);">SOAL {step+1}/{SOAL_PER_SESI}</div>'
+f'<div class="timer-box {timer_cls}">{timer_str}</div>'
+'</div>'
+'</div>', unsafe_allow_html=True)
 
-    # ── Progress bar dalam sesi ──
     pct = step / SOAL_PER_SESI * 100
-    st.markdown(f'<div class="prog-wrap"><div class="prog-fill" style="width:{pct}%;"></div></div>',
-                unsafe_allow_html=True)
+    st.markdown(f'<div class="prog-wrap"><div class="prog-fill" style="width:{pct}%;"></div></div>', unsafe_allow_html=True)
 
-    # ── Render soal ──
     if sesi == "Pass Hand":
         _render_pass_hand(soal, step)
     elif sesi == "Kecerdasan":
@@ -678,10 +666,8 @@ def show_simulation():
     elif sesi == "Kecermatan":
         _render_kecermatan(soal, step)
 
-    # Refresh timer
     time.sleep(1)
     st.rerun()
-
 
 def _render_maraton_track(sesi_aktif: str):
     steps_html = ""
@@ -692,7 +678,7 @@ def _render_maraton_track(sesi_aktif: str):
 
         if idx_s < idx_aktif:
             css   = "done"
-            skor_html = f'<span class="ms-skor">✓ {st.session_state.mar_hasil.get(s, {}).get("skor_100", 0)}</span>'
+            skor_html = f'<span class="ms-skor">✓ {st.session_state.mar_hasil.get(s, {{}}).get("skor_100", 0)}</span>'
         elif idx_s == idx_aktif:
             css   = "active"
             skor_html = '<span class="ms-skor">▶ Aktif</span>'
@@ -700,29 +686,23 @@ def _render_maraton_track(sesi_aktif: str):
             css   = ""
             skor_html = ""
 
-        steps_html += f"""
-        <div class="maraton-step {css}">
-            <span class="ms-icon">{cfg_s['icon']}</span>
-            <span class="ms-label">{cfg_s['label']}</span>
-            {skor_html}
-        </div>"""
+        steps_html += f'<div class="maraton-step {css}">'
+        steps_html += f'<span class="ms-icon">{cfg_s["icon"]}</span>'
+        steps_html += f'<span class="ms-label">{cfg_s["label"]}</span>'
+        steps_html += f'{skor_html}'
+        steps_html += '</div>'
 
     st.markdown(f'<div class="maraton-track">{steps_html}</div>', unsafe_allow_html=True)
 
-
-# ── NAV BUTTONS (Pass Hand, Kecerdasan, Kepribadian) ──
+# ── NAV BUTTONS ──
 def _nav_buttons(step: int, sesi: str):
     jawaban_step  = st.session_state.mar_jawaban[sesi][step]
     sudah_jawab   = jawaban_step is not None
     is_last       = (step == SOAL_PER_SESI - 1)
     answered_count = sum(1 for j in st.session_state.mar_jawaban[sesi] if j is not None)
 
-    st.markdown(
-        f'<div class="nav-progress">{answered_count}/{SOAL_PER_SESI} soal terjawab'
-        + (f'<span class="answered-badge">✓ Terjawab</span>' if sudah_jawab else '')
-        + '</div>',
-        unsafe_allow_html=True
-    )
+    badge = '<span class="answered-badge">✓ Terjawab</span>' if sudah_jawab else ''
+    st.markdown(f'<div class="nav-progress">{answered_count}/{SOAL_PER_SESI} soal terjawab {badge}</div>', unsafe_allow_html=True)
 
     c1, c2, c3 = st.columns([1, 1, 1])
     with c1:
@@ -742,16 +722,14 @@ def _nav_buttons(step: int, sesi: str):
                 _selesai_sesi()
                 st.rerun()
 
-
 # ── PASS HAND ──
 def _render_pass_hand(soal: dict, step: int):
-    st.markdown(f"""
-        <div class="q-box no-select">
-            <div class="q-num">PERNYATAAN {step+1} &nbsp;/&nbsp; PROFILING POLISI</div>
-            <div class="pernyataan-box">{soal.get('pernyataan','—')}</div>
-            <div style="font-size:0.78rem;color:var(--text-sec);margin-top:8px;">{soal.get('instruksi','')}</div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="q-box no-select">'
+f'<div class="q-num">PERNYATAAN {step+1} &nbsp;/&nbsp; PROFILING POLISI</div>'
+f'<div class="pernyataan-box">{soal.get("pernyataan","—")}</div>'
+f'<div style="font-size:0.78rem;color:var(--text-sec);margin-top:8px;">{soal.get("instruksi","")}</div>'
+'</div>', unsafe_allow_html=True)
 
     opsi    = ["YA", "TIDAK"]
     current = st.session_state.mar_jawaban["Pass Hand"][step]
@@ -765,15 +743,13 @@ def _render_pass_hand(soal: dict, step: int):
 
     _nav_buttons(step, "Pass Hand")
 
-
 # ── KECERDASAN ──
 def _render_kecerdasan(soal: dict, step: int):
-    st.markdown(f"""
-        <div class="q-box no-select">
-            <div class="q-num">SOAL {step+1} &nbsp;/&nbsp; {soal.get('kategori','Kecerdasan')}</div>
-            <div class="q-text">{soal.get('pertanyaan','—')}</div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="q-box no-select">'
+f'<div class="q-num">SOAL {step+1} &nbsp;/&nbsp; {soal.get("kategori","Kecerdasan")}</div>'
+f'<div class="q-text">{soal.get("pertanyaan","—")}</div>'
+'</div>', unsafe_allow_html=True)
 
     opsi    = soal.get("opsi", [])
     current = st.session_state.mar_jawaban["Kecerdasan"][step]
@@ -787,27 +763,22 @@ def _render_kecerdasan(soal: dict, step: int):
 
     _nav_buttons(step, "Kecerdasan")
 
-
 # ── KEPRIBADIAN ──
 def _render_kepribadian(soal: dict, step: int):
     arah       = soal.get("arah", "positif")
     arah_label = "Pernyataan Positif" if arah == "positif" else "Pernyataan Negatif"
     arah_css   = arah
 
-    st.markdown(f"""
-        <div class="q-box no-select">
-            <div class="q-num">PERNYATAAN {step+1} &nbsp;/&nbsp; KEPRIBADIAN</div>
-            <div class="q-text">{soal.get('pernyataan','—')}</div>
-            <div><span class="arah-badge {arah_css}">{arah_label}</span></div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="q-box no-select">'
+f'<div class="q-num">PERNYATAAN {step+1} &nbsp;/&nbsp; KEPRIBADIAN</div>'
+f'<div class="q-text">{soal.get("pernyataan","—")}</div>'
+f'<div><span class="arah-badge {arah_css}">{arah_label}</span></div>'
+'</div>', unsafe_allow_html=True)
 
-    likert_labels = [
-        "A. Sangat Setuju", "B. Setuju", "C. Ragu-ragu",
-        "D. Tidak Setuju",  "E. Sangat Tidak Setuju",
-    ]
+    likert_labels = ["A. Sangat Setuju", "B. Setuju", "C. Ragu-ragu", "D. Tidak Setuju",  "E. Sangat Tidak Setuju"]
     current = st.session_state.mar_jawaban["Kepribadian"][step]
-    # current bisa berupa huruf saja (A) atau label penuh — normalkan ke label penuh
+    
     if current and len(current) == 1:
         label_match = [l for l in likert_labels if l.startswith(current.upper() + ".")]
         current = label_match[0] if label_match else None
@@ -817,34 +788,31 @@ def _render_kepribadian(soal: dict, step: int):
         st.markdown('<div class="likert-label">Pilih Respons Anda:</div>', unsafe_allow_html=True)
         pilihan = st.radio("Respons:", likert_labels, index=idx, label_visibility="collapsed")
         if st.form_submit_button("SIMPAN JAWABAN", use_container_width=True):
-            # Simpan huruf saja (A/B/C/D/E) untuk efisiensi scoring
             st.session_state.mar_jawaban["Kepribadian"][step] = pilihan[0]
             st.rerun()
 
     _nav_buttons(step, "Kepribadian")
 
-
-# ── KECERMATAN (auto-submit, no navigasi) ──
+# ── KECERMATAN ──
 def _render_kecermatan(soal: dict, step: int):
     kunci_html = "".join(f'<div class="kunci-char">{c}</div>' for c in soal.get("kunci", []))
     kolom_nama = soal.get("nama_kolom", "KUNCI")
 
-    st.markdown(f"""
-        <div class="q-box no-select">
-            <div class="q-num">SOAL {step+1} &nbsp;/&nbsp; {kolom_nama}</div>
-            <div style="margin-bottom:12px;">
-                <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-sec);letter-spacing:1px;margin-bottom:8px;">
-                    KUNCI REFERENSI
-                </div>
-                <div class="kunci-grid">{kunci_html}</div>
-            </div>
-            <div class="q-text">Karakter apa yang <b style="color:var(--red-alert);">tidak ada</b> di baris berikut?</div>
-            <div class="tampilan-box">{soal.get('tampilan','')}</div>
-            <div class="missing-hint">Bandingkan dengan kunci referensi di atas — pilih karakter yang hilang.</div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="q-box no-select">'
+f'<div class="q-num">SOAL {step+1} &nbsp;/&nbsp; {kolom_nama}</div>'
+'<div style="margin-bottom:12px;">'
+'<div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-sec);letter-spacing:1px;margin-bottom:8px;">KUNCI REFERENSI</div>'
+f'<div class="kunci-grid">{kunci_html}</div>'
+'</div>'
+'<div class="q-text">Karakter apa yang <b style="color:var(--red-alert);">tidak ada</b> di baris berikut?</div>'
+f'<div class="tampilan-box">{soal.get("tampilan","")}</div>'
+'<div class="missing-hint">Bandingkan dengan kunci referensi di atas — pilih karakter yang hilang.</div>'
+'</div>', unsafe_allow_html=True)
 
     opsi = soal.get("opsi", [])
+    
+    # Kolom agar horizontal sesuai gambar teman user
     cols = st.columns(len(opsi))
     for i, op in enumerate(opsi):
         with cols[i]:
@@ -859,7 +827,6 @@ def _render_kecermatan(soal: dict, step: int):
                 else:
                     st.session_state.mar_step += 1
                 st.rerun()
-
 
 # ══════════════════════════════════════════════
 # HASIL AKHIR MARATON
@@ -876,25 +843,20 @@ def _show_hasil_akhir():
     pct         = min(int(rata / 100 * 100), 100)
     verdict_txt = "Selamat! Performa Anda di atas passing grade." if lulus else f"Rata-rata {rata} belum mencapai passing grade {pg}. Tetap semangat!"
 
-    st.markdown(f"""
-        <div class="final-box">
-            <div class="final-label">[ MARATON SELESAI — HASIL AKHIR ]</div>
-            <div class="final-score">{rata}</div>
-            <div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);">RATA-RATA / 100</div>
-            <div class="final-bar-wrap"><div class="{bar_cls}" style="width:{pct}%;"></div></div>
-            <div style="margin-top:14px;"><span class="{status_cls}">{status_txt}</span></div>
-            <div style="font-size:0.88rem;color:var(--text-sec);margin-top:8px;">{verdict_txt}</div>
-            <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-dim);margin-top:6px;">
-                Passing Grade: {pg} &nbsp;|&nbsp; Skor ini telah disimpan ke Leaderboard
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="final-box">'
+'<div class="final-label">[ MARATON SELESAI — HASIL AKHIR ]</div>'
+f'<div class="final-score">{rata}</div>'
+'<div style="font-family:var(--mono);font-size:0.72rem;color:var(--text-sec);">RATA-RATA / 100</div>'
+f'<div class="final-bar-wrap"><div class="{bar_cls}" style="width:{pct}%;"></div></div>'
+f'<div style="margin-top:14px;"><span class="{status_cls}">{status_txt}</span></div>'
+f'<div style="font-size:0.88rem;color:var(--text-sec);margin-top:8px;">{verdict_txt}</div>'
+f'<div style="font-family:var(--mono);font-size:0.65rem;color:var(--text-dim);margin-top:6px;">Passing Grade: {pg} &nbsp;|&nbsp; Skor ini telah disimpan ke Leaderboard</div>'
+'</div>', unsafe_allow_html=True)
 
-    # ── Skor per sesi ──
-    st.markdown("""
-        <div class="sec-head"><div class="sec-head-line"></div>
-        <div class="sec-head-text">Skor Per Sesi</div></div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="sec-head"><div class="sec-head-line"></div>'
+'<div class="sec-head-text">Skor Per Sesi</div></div>', unsafe_allow_html=True)
 
     skor_cards = ""
     for sesi in URUTAN_MARATON:
@@ -902,12 +864,12 @@ def _show_hasil_akhir():
         hasil_s = st.session_state.mar_hasil.get(sesi, {})
         s100  = hasil_s.get("skor_100", 0)
         s_pct = min(s100, 100)
-        skor_cards += f"""
-        <div class="skor-card">
-            <span class="sk-label">{cfg_s['icon']} {cfg_s['label']}</span>
-            <span class="sk-val">{s100}</span>
-            <div class="sk-bar-wrap"><div class="sk-bar-fill" style="width:{s_pct}%;background:{cfg_s['color']};"></div></div>
-        </div>"""
+        skor_cards += f'<div class="skor-card">'
+        skor_cards += f'<span class="sk-label">{cfg_s["icon"]} {cfg_s["label"]}</span>'
+        skor_cards += f'<span class="sk-val">{s100}</span>'
+        skor_cards += f'<div class="sk-bar-wrap"><div class="sk-bar-fill" style="width:{s_pct}%;background:{cfg_s["color"]};"></div></div>'
+        skor_cards += '</div>'
+        
     st.markdown(f'<div class="skor-grid">{skor_cards}</div>', unsafe_allow_html=True)
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
@@ -922,15 +884,11 @@ def _show_hasil_akhir():
             st.session_state.page = "home"
             st.rerun()
 
-    # ── EVALUASI / PEMBAHASAN ──
     st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
-    st.markdown("""
-        <div class="sec-head"><div class="sec-head-line"></div>
-        <div class="sec-head-text">📖 Evaluasi & Pembahasan</div></div>
-        <div style="font-size:0.83rem;color:var(--text-sec);margin-bottom:16px;">
-            Review soal yang jawabannya belum optimal. Pelajari pembahasannya untuk performa lebih baik di sesi berikutnya.
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+'<div class="sec-head"><div class="sec-head-line"></div>'
+'<div class="sec-head-text">📖 Evaluasi & Pembahasan</div></div>'
+'<div style="font-size:0.83rem;color:var(--text-sec);margin-bottom:16px;">Review soal yang jawabannya belum optimal. Pelajari pembahasannya untuk performa lebih baik di sesi berikutnya.</div>', unsafe_allow_html=True)
 
     tab_labels = [f"{SESI_CONFIG[s]['icon']} {s}" for s in URUTAN_MARATON]
     tabs = st.tabs(tab_labels)
@@ -941,7 +899,6 @@ def _show_hasil_akhir():
             detail  = hasil_s.get("detail", [])
             _render_evaluasi(sesi, detail)
 
-
 def _render_evaluasi(sesi: str, detail: list):
     if not detail:
         st.markdown('<div style="color:var(--text-dim);font-size:0.85rem;padding:16px 0;">Tidak ada data evaluasi.</div>', unsafe_allow_html=True)
@@ -949,62 +906,44 @@ def _render_evaluasi(sesi: str, detail: list):
 
     salah_count = sum(1 for d in detail if not d.get("benar", True))
     benar_count = len(detail) - salah_count
-    st.markdown(f"""
-        <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;">
-            <div style="font-family:var(--mono);font-size:0.72rem;color:#39d353;">✓ Benar: {benar_count}</div>
-            <div style="font-family:var(--mono);font-size:0.72rem;color:#f85149;">✗ Salah/Sub-optimal: {salah_count}</div>
-        </div>
-    """, unsafe_allow_html=True)
+    
+    st.markdown(
+'<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
+f'<div style="font-family:var(--mono);font-size:0.72rem;color:#39d353;">✓ Benar: {benar_count}</div>'
+f'<div style="font-family:var(--mono);font-size:0.72rem;color:#f85149;">✗ Salah/Sub-optimal: {salah_count}</div>'
+'</div>', unsafe_allow_html=True)
 
     for i, d in enumerate(detail, 1):
         is_benar = d.get("benar", True)
         css_cls  = "benar" if is_benar else "salah"
         icon     = "✓" if is_benar else "✗"
+        icon_col = '#39d353' if is_benar else '#f85149'
 
         if sesi == "Pass Hand":
             q_html = f"<b>{i}.</b> {d.get('pernyataan','')}"
-            ans_html = (
-                f'<span class="user-ans">Jawaban Lo: {d.get("jawaban_user","—")}</span>'
-                f'<span class="correct-ans">Ideal: {d.get("jawaban_ideal","—")}</span>'
-            )
-
+            ans_html = f'<span class="user-ans">Jawaban Lo: {d.get("jawaban_user","—")}</span><span class="correct-ans">Ideal: {d.get("jawaban_ideal","—")}</span>'
         elif sesi == "Kecerdasan":
             q_html   = f"<b>{i}.</b> {d.get('pertanyaan','')}"
-            ans_html = (
-                f'<span class="user-ans">Lo: {d.get("teks_user","—")}</span>'
-                f'<span class="correct-ans">Benar: {d.get("teks_benar","—")}</span>'
-            )
-
+            ans_html = f'<span class="user-ans">Lo: {d.get("teks_user","—")}</span><span class="correct-ans">Benar: {d.get("teks_benar","—")}</span>'
         elif sesi == "Kepribadian":
-            label_map = {"A": "Sangat Setuju", "B": "Setuju", "C": "Ragu-ragu",
-                         "D": "Tidak Setuju",  "E": "Sangat Tidak Setuju"}
+            label_map = {"A": "Sangat Setuju", "B": "Setuju", "C": "Ragu-ragu", "D": "Tidak Setuju",  "E": "Sangat Tidak Setuju"}
             jwb_huruf = d.get("jawaban_user", "C")
             q_html    = f"<b>{i}.</b> {d.get('pernyataan','')}"
-            ans_html  = (
-                f'<span class="user-ans">Lo: {label_map.get(jwb_huruf, jwb_huruf)} '
-                f'(+{d.get("poin",0)} poin)</span>'
-                f'<span class="correct-ans">Arah: {d.get("arah","").upper()}</span>'
-            )
-
-        else:  # Kecermatan
+            ans_html  = f'<span class="user-ans">Lo: {label_map.get(jwb_huruf, jwb_huruf)} (+{d.get("poin",0)} poin)</span><span class="correct-ans">Arah: {d.get("arah","").upper()}</span>'
+        else:
             q_html   = f"<b>{i}.</b> Kunci <b>{d.get('nama_kolom','')}</b>: tampilan <code>{d.get('tampilan','')}</code>"
-            ans_html = (
-                f'<span class="user-ans">Lo: {d.get("jawaban_user","—")}</span>'
-                f'<span class="correct-ans">Benar: {d.get("jawaban_benar","—")}</span>'
-            )
+            ans_html = f'<span class="user-ans">Lo: {d.get("jawaban_user","—")}</span><span class="correct-ans">Benar: {d.get("jawaban_benar","—")}</span>'
 
         pembahasan = d.get("pembahasan", "")
-        st.markdown(f"""
-            <div class="eval-item {css_cls}">
-                <div style="font-family:var(--mono);font-size:0.6rem;color:{'#39d353' if is_benar else '#f85149'};letter-spacing:1px;margin-bottom:6px;">
-                    {icon} SOAL {i}
-                </div>
-                <div class="eval-q">{q_html}</div>
-                <div class="eval-ans">{ans_html}</div>
-                {'<div class="eval-pembahasan">💡 ' + pembahasan + '</div>' if pembahasan else ''}
-            </div>
-        """, unsafe_allow_html=True)
-
+        pemb_div = f'<div class="eval-pembahasan">💡 {pembahasan}</div>' if pembahasan else ''
+        
+        st.markdown(
+f'<div class="eval-item {css_cls}">'
+f'<div style="font-family:var(--mono);font-size:0.6rem;color:{icon_col};letter-spacing:1px;margin-bottom:6px;">{icon} SOAL {i}</div>'
+f'<div class="eval-q">{q_html}</div>'
+f'<div class="eval-ans">{ans_html}</div>'
+f'{pemb_div}'
+'</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════
 # MAIN ROUTING
@@ -1019,14 +958,12 @@ def main():
         show_auth()
         return
 
-    # ── Sidebar ──
     with st.sidebar:
-        st.markdown("""
-            <div style="text-align:center;padding:20px 0 14px;">
-                <div style="font-family:'JetBrains Mono',monospace;font-size:0.58rem;color:#fb6b00;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px;">[ MARATON v4.0 ]</div>
-                <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.45rem;font-weight:900;color:#e6edf3;letter-spacing:-0.5px;">PSYCHOTECH</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+'<div style="text-align:center;padding:20px 0 14px;">'
+'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.58rem;color:#fb6b00;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px;">[ MARATON v4.0 ]</div>'
+'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:1.45rem;font-weight:900;color:#e6edf3;letter-spacing:-0.5px;">PSYCHOTECH</div>'
+'</div>', unsafe_allow_html=True)
         st.divider()
 
         if st.button("🏠  HOME", use_container_width=True, key="nav_home"):
@@ -1046,19 +983,16 @@ def main():
             st.session_state.logged_in = False
             st.rerun()
 
-        st.markdown("""
-            <div style="text-align:center;margin-top:14px;font-size:0.7rem;color:#484f58;">
-                🚀 <a href="https://www.instagram.com/growing_together369" target="_blank"
-                   style="color:#fb6b00;text-decoration:none;font-weight:700;">@growing_together369</a>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+'<div style="text-align:center;margin-top:14px;font-size:0.7rem;color:#484f58;">'
+'🚀 <a href="https://www.instagram.com/growing_together369" target="_blank" style="color:#fb6b00;text-decoration:none;font-weight:700;">@growing_together369</a>'
+'</div>', unsafe_allow_html=True)
 
     page = st.session_state.page
     if page == "home":
         show_home()
     elif page == "simulasi":
         show_simulation()
-
 
 if __name__ == "__main__":
     main()
